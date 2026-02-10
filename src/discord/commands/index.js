@@ -5,7 +5,8 @@ const commands = [
   require("./bets"),
   require("./live"),
   require("./help"),
-  require("./give")
+  require("./give"),
+  require("./football")
 ];
 
 function getCommandData() {

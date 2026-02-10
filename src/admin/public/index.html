@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Football Admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/admin/styles.css" />
+  </head>
+  <body>
+    <div class="bg-orb orb-one"></div>
+    <div class="bg-orb orb-two"></div>
+
+    <main class="page">
+      <header class="hero">
+        <p class="eyebrow">Friendly betting control (friendly nhaaaaaaa)</p>
+        <h1>Football Admin Panel</h1>
+        <p class="sub">Create matches, edit odds, update scores, and close games.</p>
+      </header>
+
+      <nav class="tabs">
+        <button class="tab-btn active" data-tab="manage">Manage</button>
+        <button class="tab-btn" data-tab="closed">Closed</button>
+        <button class="tab-btn" data-tab="users">Users</button>
+      </nav>
+
+      <section class="panel tab-page" data-page="manage">
+        <h2>Create Match</h2>
+        <form id="create-form" class="grid">
+          <label>
+            Home team
+            <input name="homeTeam" type="text" required />
+          </label>
+          <label>
+            Away team
+            <input name="awayTeam" type="text" required />
+          </label>
+          <label>
+            Stadium
+            <input name="stadium" type="text" />
+          </label>
+          <label>
+            Kickoff
+            <input name="kickoff" type="datetime-local" required />
+          </label>
+          <label class="full">
+            Odds (one per line: key=multiplier)
+            <textarea name="odds" rows="4" required></textarea>
+          </label>
+          <button type="submit">Create</button>
+        </form>
+      </section>
+
+      <section class="panel tab-page" data-page="manage">
+        <h2>Open Matches</h2>
+        <div id="open-list" class="list"></div>
+      </section>
+
+      <section class="panel tab-page" data-page="closed">
+        <h2>Closed Matches</h2>
+        <div id="closed-list" class="list"></div>
+      </section>
+
+      <section class="panel tab-page" data-page="users">
+        <h2>Users</h2>
+        <form id="user-form" class="grid">
+          <label>
+            User ID
+            <input name="userId" type="text" required />
+          </label>
+          <label>
+            User name
+            <input name="userName" type="text" />
+          </label>
+          <label>
+            Amount (+/-)
+            <input name="amount" type="number" required />
+          </label>
+          <button type="submit">Add balance</button>
+        </form>
+        <div id="user-list" class="list"></div>
+      </section>
+    </main>
+
+    <script src="/admin/admin.js"></script>
+  </body>
+</html>

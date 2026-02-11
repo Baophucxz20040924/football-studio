@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AVIATOR (CRASH GAME) – Game Rule Specification</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700&family=Space+Grotesk:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/aviator/assets/aviator.css" />
+  </head>
+  <body>
+    <div class="noise" aria-hidden="true"></div>
+    <main>
+      <section class="game">
+        <div class="game-board">
+          <div class="board-top">
+            <div>
+              <div class="state-label">State</div>
+              <div class="state-value" id="stateValue">WAITING</div>
+            </div>
+            <div class="multiplier" id="multiplierValue">1.00x</div>
+            <div class="crash-label" id="crashLabel">Crash point hidden</div>
+          </div>
+          <div class="board-center">
+            <div class="timer" id="timerLabel">Next round in <span id="countdownValue">3.0</span>s</div>
+            <div class="flight-bar">
+              <div class="flight-fill" id="flightFill"></div>
+            </div>
+          </div>
+          <div class="game-history" id="historyList"></div>
+        </div>
+        <div class="bet-panel">
+          <div class="balance">
+            <span>Balance</span>
+            <strong id="balanceValue">0.00</strong>
+          </div>
+          <div class="user-note" id="userNote"></div>
+
+          <div class="bet-card">
+            <div class="bet-title">Bet 1</div>
+            <label class="field">Amount
+              <input id="betAmount1" type="number" min="1" step="1" value="50" />
+            </label>
+            <label class="field">Auto cashout (optional)
+              <input id="autoCashout1" type="number" min="1" step="0.01" value="2.00" />
+            </label>
+            <div class="bet-actions">
+              <button class="btn" id="placeBet1">Place Bet</button>
+              <button class="btn ghost cashout-btn" id="cashout1" disabled>Cash Out</button>
+            </div>
+            <div class="bet-status" id="betStatus1">Idle</div>
+          </div>
+
+          <div class="bet-card">
+            <div class="bet-title">Bet 2</div>
+            <label class="field">Amount
+              <input id="betAmount2" type="number" min="1" step="1" value="50" />
+            </label>
+            <label class="field">Auto cashout (optional)
+              <input id="autoCashout2" type="number" min="1" step="0.01" value="3.00" />
+            </label>
+            <div class="bet-actions">
+              <button class="btn" id="placeBet2">Place Bet</button>
+              <button class="btn ghost cashout-btn" id="cashout2" disabled>Cash Out</button>
+            </div>
+            <div class="bet-status" id="betStatus2">Idle</div>
+          </div>
+        </div>
+      </section>
+    </main>
+    <script src="/aviator/assets/aviator.js"></script>
+  </body>
+</html>

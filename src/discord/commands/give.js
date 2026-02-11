@@ -4,7 +4,7 @@ const {
   ButtonBuilder,
   ButtonStyle
 } = require("discord.js");
-const { buildEmbed, getOrCreateUser, normalizeAmount } = require("./utils");
+const { buildEmbed, getOrCreateUser, normalizeAmount, formatPoints } = require("./utils");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -22,7 +22,7 @@ module.exports = {
 
     if (!amount) {
       const embed = buildEmbed({
-        title: "Số tiền không hợp lệ",
+        title: "Số tiền không hợp lệ ❌",
         description: "Vui lòng nhập số dương. \ud83d\udcb8",
         color: 0xf36c5c
       });
@@ -31,7 +31,7 @@ module.exports = {
 
     if (receiver.id === interaction.user.id) {
       const embed = buildEmbed({
-        title: "Không thể tự chuyển",
+        title: "Không thể tự chuyển 🚫",
         description: "Bạn không thể tự chuyển điểm cho chính mình.",
         color: 0xf36c5c
       });
@@ -44,9 +44,9 @@ module.exports = {
     const requestEmbed = buildEmbed({
       title: "Yêu cầu chuyển điểm \ud83d\udce8",
       description: [
-        `Từ: **${senderName}**`, 
-        `Đến: **${receiverName}**`, 
-        `Số tiền: **${amount}** \ud83d\udcb0`, 
+        `Từ: **${senderName}**`,
+        `Đến: **${receiverName}**`,
+        `Số tiền: **${formatPoints(amount)}** \ud83d\udcb0`,
         "Người gửi vui lòng xác nhận."
       ].join("\n"),
       color: 0xf6c244
@@ -128,7 +128,7 @@ module.exports = {
           description: [
             `Từ: **${senderName}**`,
             `Đến: **${receiverName}**`,
-            `Số tiền: **${parsedAmount}** \ud83d\udcb0`
+            `Số tiền: **${formatPoints(parsedAmount)}** \ud83d\udcb0`
           ].join("\n"),
           color: 0x6ae4c5
         })],

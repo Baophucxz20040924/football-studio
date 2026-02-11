@@ -1,7 +1,7 @@
 const { SlashCommandBuilder } = require("discord.js");
 const Match = require("../../models/Match");
 const Bet = require("../../models/Bet");
-const { formatOdds, buildEmbed, normalizeAmount, getOrCreateUser } = require("./utils");
+const { formatOdds, buildEmbed, normalizeAmount, getOrCreateUser, formatPoints } = require("./utils");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -23,7 +23,7 @@ module.exports = {
 
     if (!amount) {
       const embed = buildEmbed({
-        title: "Invalid amount",
+        title: "Invalid amount ❌",
         description: "Please enter a positive number. \ud83d\udcb8",
         color: 0xf36c5c
       });
@@ -38,7 +38,7 @@ module.exports = {
     }
     if (!match || match.status !== "open") {
       const embed = buildEmbed({
-        title: "Match not found",
+        title: "Match not found 🗓️",
         description: "This match is closed or does not exist. \ud83d\uddd3\ufe0f",
         color: 0xf36c5c
       });
@@ -47,7 +47,7 @@ module.exports = {
 
     if (match.betLocked) {
       const embed = buildEmbed({
-        title: "Betting is locked",
+        title: "Betting is locked 🔒",
         description: "This match is temporarily locked for betting. \ud83d\udd12",
         color: 0xf36c5c
       });
@@ -57,7 +57,7 @@ module.exports = {
     const odd = match.odds.find((o) => o.key === pickKey);
     if (!odd) {
       const embed = buildEmbed({
-        title: "Invalid pick",
+        title: "Invalid pick ❗",
         description: `Available odds: ${formatOdds(match.odds)} \u26bd`,
         color: 0xf36c5c
       });
@@ -68,8 +68,8 @@ module.exports = {
     const user = await getOrCreateUser(interaction.user.id, userName);
     if (user.balance < amount) {
       const embed = buildEmbed({
-        title: "Not enough balance",
-        description: `Current balance: ${user.balance} \ud83d\udcb5`,
+        title: "Not enough balance 💸",
+        description: `Current balance: ${formatPoints(user.balance)} \ud83d\udcb5`,
         color: 0xf36c5c
       });
       return interaction.reply({ embeds: [embed], ephemeral: true });
@@ -91,7 +91,7 @@ module.exports = {
       description: [
         `Match: **${match.homeTeam} vs ${match.awayTeam}**`,
         `Pick: **${pickKey}** (x${odd.multiplier})`,
-        `Amount: **${amount}**`
+        `Amount: **${formatPoints(amount)}**`
       ].join("\n"),
       color: 0x6ae4c5
     });

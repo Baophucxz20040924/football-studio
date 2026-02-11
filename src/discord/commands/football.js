@@ -7,7 +7,7 @@ const {
   TextInputBuilder,
   TextInputStyle
 } = require("discord.js");
-const { buildEmbed, normalizeAmount, getOrCreateUser } = require("./utils");
+const { buildEmbed, normalizeAmount, getOrCreateUser, formatPoints } = require("./utils");
 
 const BET_WINDOW_MS = 30_000;
 const MAX_IDLE_ROUNDS = 4;
@@ -75,7 +75,7 @@ function getSpinFrame(index) {
 
 function buildRoundEmbed(round, secondsLeft, frame) {
   return buildEmbed({
-    title: "Football Studio",
+    title: "Football Studio ⚽",
     description: [
       `Round: **${round}**`,
       `Còn lại: **${secondsLeft}s** ${frame}`,
@@ -89,7 +89,7 @@ function buildRoundEmbed(round, secondsLeft, frame) {
 
 function buildRevealEmbed(round, frame) {
   return buildEmbed({
-    title: "Football Studio",
+    title: "Football Studio ⚽",
     description: [
       `Round: **${round}**`,
       `Đang chia bài... ${frame}`
@@ -193,23 +193,24 @@ async function runSession(channel, session) {
         return;
       }
 
+      await submitted.deferReply({ ephemeral: true });
+
       const amount = normalizeAmount(submitted.fields.getTextInputValue("amount").trim());
       if (!amount) {
-        await submitted.reply({ content: "Số điểm không hợp lệ.", ephemeral: true });
+        await submitted.editReply({ content: "Số điểm không hợp lệ." });
         return;
       }
 
       if (collector.ended) {
-        await submitted.reply({ content: "Phiên cược đã kết thúc.", ephemeral: true });
+        await submitted.editReply({ content: "Phiên cược đã kết thúc." });
         return;
       }
 
       const userName = submitted.user.globalName || submitted.user.username;
       const user = await getOrCreateUser(submitted.user.id, userName);
       if (user.balance < amount) {
-        await submitted.reply({
-          content: `Không đủ số dư. Hiện tại: ${user.balance}.`,
-          ephemeral: true
+        await submitted.editReply({
+          content: `Không đủ số dư. Hiện tại: ${formatPoints(user.balance)}.`
         });
         return;
       }
@@ -224,9 +225,8 @@ async function runSession(channel, session) {
         amount
       });
 
-      await submitted.reply({
-        content: `Đã đặt cược **${amount}** vào **${getPickLabel(pick)}**.`,
-        ephemeral: true
+      await submitted.editReply({
+        content: `Đã đặt cược **${formatPoints(amount)}** vào **${getPickLabel(pick)}**.`
       });
     });
 
@@ -263,14 +263,14 @@ async function runSession(channel, session) {
 
     const settlement = await settleBets(bets, result);
     const resultEmbed = buildEmbed({
-      title: "Kết quả Football Studio",
+      title: "Kết quả Football Studio 🏁",
       description: [
         `Home: **${homeCard.label}**`,
         `Away: **${awayCard.label}**`,
         `Kết quả: **${getPickLabel(result)}**`,
         `Số lượt cược: **${bets.length}**`,
         `Thắng: **${settlement.winners}** | Hoàn nửa: **${settlement.refunds}**`,
-        `Tổng trả thưởng: **${settlement.totalPayout}**`
+        `Tổng trả thưởng: **${formatPoints(settlement.totalPayout)}**`
       ].join("\n"),
       color: result === "draw" ? 0xf6c244 : 0x6ae4c5
     });

@@ -27,6 +27,14 @@ function normalizeAmount(value) {
   return Math.floor(amount);
 }
 
+function formatPoints(value) {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) {
+    return String(value);
+  }
+  return amount.toLocaleString("en-US");
+}
+
 async function getOrCreateUser(userId, userName) {
   let user = await User.findOne({ userId });
   if (!user) {
@@ -53,5 +61,6 @@ module.exports = {
   formatKickoff,
   buildEmbed,
   normalizeAmount,
+  formatPoints,
   getOrCreateUser
 };

@@ -10,7 +10,7 @@ module.exports = {
     const matches = await Match.find({ status: "open" }).sort({ kickoff: 1 });
     if (matches.length === 0) {
       const embed = buildEmbed({
-        title: "No open matches",
+        title: "No open matches 🚫",
         description: "No games are open for betting right now. \ud83c\udfdb\ufe0f",
         color: 0x6ae4c5
       });

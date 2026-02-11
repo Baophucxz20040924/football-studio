@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require("discord.js");
-const { buildEmbed, getOrCreateUser } = require("./utils");
+const { buildEmbed, getOrCreateUser, formatPoints } = require("./utils");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -10,7 +10,7 @@ module.exports = {
     const user = await getOrCreateUser(interaction.user.id, userName);
     const embed = buildEmbed({
       title: "Your balance \ud83d\udcb0",
-      description: `You have **${user.balance}** points available. \ud83e\ude99`,
+      description: `You have **${formatPoints(user.balance)}** points available. \ud83e\ude99`,
       color: 0x6ae4c5
     });
     return interaction.reply({ embeds: [embed], ephemeral: true });

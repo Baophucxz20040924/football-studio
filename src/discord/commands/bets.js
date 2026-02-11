@@ -1,7 +1,7 @@
 const { SlashCommandBuilder } = require("discord.js");
 const Bet = require("../../models/Bet");
 const Match = require("../../models/Match");
-const { buildEmbed, getOrCreateUser } = require("./utils");
+const { buildEmbed, getOrCreateUser, formatPoints } = require("./utils");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -20,7 +20,7 @@ module.exports = {
 
     if (bets.length === 0) {
       const embed = buildEmbed({
-        title: "No open bets",
+        title: "No open bets 💤",
         description: "You have no bets yet. \ud83c\udf43",
         color: 0x6ae4c5
       });
@@ -61,7 +61,7 @@ module.exports = {
         `Status: ${statusEmoji} **${statusLabel}** | Score: ${score}`,
         corner,
         `Pick: ${b.pickKey} (x${b.multiplier}) \u26bd`,
-        `Stake: ${b.amount} | Win: ${potential} \ud83d\udcb0`
+        `Stake: ${formatPoints(b.amount)} | Win: ${formatPoints(potential)} \ud83d\udcb0`
       ].join("\n");
 
       return buildEmbed({

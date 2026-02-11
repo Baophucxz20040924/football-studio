@@ -6,7 +6,13 @@ const commands = [
   require("./live"),
   require("./help"),
   require("./give"),
-  require("./football")
+  require("./aviator"),
+  require("./football"),
+  require("./bcr"),
+  require("./tx"),
+  require("./helpfootball"),
+  require("./helpbcr"),
+  require("./daily")
 ];
 
 function getCommandData() {

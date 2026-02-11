@@ -23,7 +23,7 @@ module.exports = {
     const matches = await Match.find({ status: "open", isLive: true }).sort({ kickoff: 1 });
     if (matches.length === 0) {
       const embed = buildEmbed({
-        title: "No live matches",
+        title: "No live matches ⏳",
         description: "No games are live right now. \ud83d\udcf4",
         color: 0xf36c5c
       });

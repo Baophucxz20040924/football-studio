@@ -19,6 +19,7 @@ module.exports = {
       "**Trò chơi**",
       "\u26bd **/football** - Football Studio (Home/Away/Draw)",
       "\ud83c\udfb2 **/bcr** - Baccarat (Player/Banker/Tie)",
+      "✈️ **/aviator** - Aviator Crash Game",
       "",
       "**Ví dụ nhanh**",
       "`/bet match_code: 123 pick_key: W1 amount: 100`",

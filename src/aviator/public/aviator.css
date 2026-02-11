@@ -30,6 +30,16 @@ body {
   min-height: 100vh;
 }
 
+@supports (-webkit-touch-callout: none) {
+  body {
+    min-height: 100svh;
+  }
+
+  main {
+    min-height: 100svh;
+  }
+}
+
 .noise {
   position: fixed;
   inset: 0;
@@ -174,6 +184,11 @@ main {
   border: 1px solid rgba(34, 49, 66, 0.8);
   box-shadow: var(--shadow);
   display: grid;
+  grid-template-areas:
+    "top"
+    "center"
+    "history"
+    "bets";
   gap: 18px;
   min-height: 320px;
   position: relative;
@@ -191,6 +206,7 @@ main {
 }
 
 .board-top {
+  grid-area: top;
   display: flex;
   flex-wrap: wrap;
   gap: 16px;
@@ -227,6 +243,7 @@ main {
 }
 
 .board-center {
+  grid-area: center;
   display: grid;
   gap: 14px;
   position: relative;
@@ -253,6 +270,7 @@ main {
 }
 
 .game-history {
+  grid-area: history;
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
@@ -261,6 +279,7 @@ main {
 }
 
 .round-bets {
+  grid-area: bets;
   display: grid;
   gap: 10px;
   margin-top: 6px;
@@ -634,6 +653,28 @@ main {
     padding-right: 6vw;
   }
 
+  main {
+    padding-bottom: 36px;
+    gap: 18px;
+  }
+
+  .game {
+    gap: 16px;
+  }
+
+  .game-board {
+    padding: 18px;
+    gap: 14px;
+  }
+
+  .game-board {
+    grid-template-areas:
+      "history"
+      "top"
+      "center"
+      "bets";
+  }
+
   .state-flow {
     gap: 8px;
   }
@@ -641,5 +682,61 @@ main {
   .hero-card,
   .card {
     padding: 18px;
+  }
+
+  .bet-panel {
+    padding: 14px;
+    gap: 12px;
+  }
+
+  .balance {
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+
+  .balance strong {
+    font-size: 16px;
+  }
+
+  .user-note {
+    font-size: 11px;
+  }
+
+  .bet-card {
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .bet-title {
+    font-size: 14px;
+  }
+
+  .field {
+    gap: 4px;
+    font-size: 11px;
+  }
+
+  .field input {
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+
+  .bet-actions {
+    gap: 8px;
+  }
+
+  .btn {
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+
+  .cashout-btn {
+    font-size: 14px;
+    padding: 10px 12px;
+    border-radius: 12px;
+  }
+
+  .bet-status {
+    font-size: 12px;
   }
 }

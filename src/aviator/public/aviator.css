@@ -260,6 +260,63 @@ main {
   z-index: 1;
 }
 
+.round-bets {
+  display: grid;
+  gap: 10px;
+  margin-top: 6px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(34, 49, 66, 0.7);
+  background: rgba(9, 13, 18, 0.65);
+  position: relative;
+  z-index: 1;
+  min-height: 64px;
+}
+
+.round-bets-title {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+}
+
+.round-bets-list {
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.round-bet {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(15, 21, 29, 0.8);
+  border: 1px solid rgba(34, 49, 66, 0.6);
+}
+
+.round-bet .name {
+  font-weight: 600;
+}
+
+.round-bet .result {
+  font-weight: 700;
+}
+
+.round-bet.win .result {
+  color: var(--ok);
+}
+
+.round-bet.lose .result {
+  color: var(--danger);
+}
+
+.round-bet.open .result {
+  color: var(--muted);
+}
+
 .bet-panel {
   background: var(--panel);
   border-radius: 22px;

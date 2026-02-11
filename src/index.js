@@ -33,6 +33,7 @@ const aviatorState = {
 
 const aviatorClients = new Map();
 const aviatorOpenBets = new Map();
+let aviatorRoundBets = [];
 
 async function generateMatchCode() {
   for (let attempt = 0; attempt < 50; attempt += 1) {
@@ -162,6 +163,25 @@ function generateAviatorCrashPoint() {
   return crash;
 }
 
+function updateRoundBet(betId, updates) {
+  const target = aviatorRoundBets.find((item) => item.betId === betId);
+  if (!target) {
+    return;
+  }
+  Object.assign(target, updates);
+  broadcastAviator({
+    type: "roundBets",
+    bets: aviatorRoundBets.map((item) => ({
+      userId: item.userId,
+      userName: item.userName,
+      amount: item.amount,
+      status: item.status,
+      cashoutAt: item.cashoutAt,
+      winAmount: item.winAmount
+    }))
+  });
+}
+
 async function resolveAviatorWin(betId, multiplier) {
   const bet = await AviatorBet.findById(betId);
   if (!bet || bet.status !== "open") {
@@ -185,6 +205,11 @@ async function resolveAviatorWin(betId, multiplier) {
   await user.save();
 
   aviatorOpenBets.delete(betId);
+  updateRoundBet(String(bet._id), {
+    status: "won",
+    cashoutAt: bet.cashoutAt,
+    winAmount: bet.winAmount
+  });
   sendToAviatorUser(bet.userId, {
     type: "bet",
     betId: String(bet._id),
@@ -208,6 +233,11 @@ async function resolveAviatorLose(betId) {
   await pruneAviatorHistory();
   aviatorOpenBets.delete(betId);
 
+  updateRoundBet(String(bet._id), {
+    status: "lost",
+    winAmount: 0
+  });
+
   sendToAviatorUser(bet.userId, {
     type: "bet",
     betId: String(bet._id),
@@ -220,9 +250,10 @@ function startAviatorWaiting() {
   aviatorState.status = "WAITING";
   aviatorState.multiplier = 1;
   aviatorState.crashPoint = 1;
-  aviatorState.countdown = 3 + Math.random() * 2;
+  aviatorState.countdown = 10;
   aviatorState.startTime = 0;
   aviatorState.resolving = false;
+  aviatorRoundBets = [];
 
   if (aviatorState.intervalId) {
     clearInterval(aviatorState.intervalId);
@@ -301,6 +332,17 @@ async function resolveAviatorCrash() {
     await resolveAviatorLose(betId);
   }
 
+  broadcastAviator({
+    type: "roundBets",
+    bets: aviatorRoundBets.map((item) => ({
+      userId: item.userId,
+      userName: item.userName,
+      amount: item.amount,
+      status: item.status,
+      cashoutAt: item.cashoutAt,
+      winAmount: item.winAmount
+    }))
+  });
   broadcastAviator({ type: "history" });
   setTimeout(() => {
     startAviatorWaiting();
@@ -434,6 +476,29 @@ app.post("/api/aviator/bet/place", async (req, res) => {
     amount: bet.amount,
     autoCashout: bet.autoCashout,
     slot: bet.slot
+  });
+
+  aviatorRoundBets.push({
+    betId: String(bet._id),
+    userId: user.userId,
+    userName: user.userName || "",
+    amount: bet.amount,
+    autoCashout: bet.autoCashout,
+    status: "open",
+    cashoutAt: 0,
+    winAmount: 0
+  });
+
+  broadcastAviator({
+    type: "roundBets",
+    bets: aviatorRoundBets.map((item) => ({
+      userId: item.userId,
+      userName: item.userName,
+      amount: item.amount,
+      status: item.status,
+      cashoutAt: item.cashoutAt,
+      winAmount: item.winAmount
+    }))
   });
 
   user.balance -= amount;

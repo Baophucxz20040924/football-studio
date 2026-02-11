@@ -46,6 +46,7 @@ sudo npm i -g pm2
 pm2 start src/index.js --name football-bot
 pm2 save
 pm2 startup
+pm2 restart football-bot
 ```
 
 `pm2 startup` will print a command starting with `sudo`. Run that command so the bot restarts on reboot.

@@ -17,7 +17,8 @@ const ui = {
   cashout2: document.getElementById("cashout2"),
   betStatus1: document.getElementById("betStatus1"),
   betStatus2: document.getElementById("betStatus2"),
-  userNote: document.getElementById("userNote")
+  userNote: document.getElementById("userNote"),
+  roundBetsList: document.getElementById("roundBetsList")
 };
 
 const state = {
@@ -100,6 +101,42 @@ function updateHistory() {
     }
     chip.textContent = formatMultiplier(value);
     ui.historyList.appendChild(chip);
+  });
+}
+
+function renderRoundBets(bets) {
+  if (!ui.roundBetsList) {
+    return;
+  }
+  ui.roundBetsList.innerHTML = "";
+  if (!Array.isArray(bets) || bets.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "round-bet open";
+    empty.innerHTML = "<span class=\"name\">No bets</span><span class=\"result\">-</span>";
+    ui.roundBetsList.appendChild(empty);
+    return;
+  }
+
+  bets.forEach((item) => {
+    const row = document.createElement("div");
+    const status = item.status || "open";
+    row.className = `round-bet ${status}`;
+
+    const displayName = item.userName || item.userId || "Unknown";
+    const amount = Number(item.amount) || 0;
+    const winAmount = Number(item.winAmount) || 0;
+    let resultText = "Pending";
+    if (status === "won") {
+      resultText = `+${formatMoney(winAmount)}`;
+    } else if (status === "lost") {
+      resultText = `-${formatMoney(amount)}`;
+    }
+
+    row.innerHTML = `
+      <span class="name">${displayName}</span>
+      <span class="result">${resultText}</span>
+    `;
+    ui.roundBetsList.appendChild(row);
   });
 }
 
@@ -257,6 +294,7 @@ function handleStateUpdate(snapshot) {
         updateBetStatus(index, "Idle");
       }
     });
+    renderRoundBets([]);
   }
 
   updateDisplay();
@@ -311,6 +349,9 @@ function connectStream() {
     if (payload.type === "bet") {
       handleBetUpdate(payload);
     }
+    if (payload.type === "roundBets") {
+      renderRoundBets(payload.bets || []);
+    }
   };
 
   stream.onerror = () => {
@@ -327,6 +368,7 @@ loadSession()
   .then(loadHistory)
   .then(() => {
     updateDisplay();
+    renderRoundBets([]);
     connectStream();
   })
   .catch((err) => {

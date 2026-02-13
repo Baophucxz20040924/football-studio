@@ -14,6 +14,28 @@ const MAX_IDLE_ROUNDS = 4;
 const HOME_PAYOUT_MULTIPLIER = 2;
 const DRAW_PAYOUT_MULTIPLIER = 11;
 const CARD_ORDER = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"];
+const CARD_SUITS = ["spades", "hearts", "diamonds", "clubs"];
+const CARD_SUIT_EMOJIS = {
+  spades: process.env.CARD_EMOJI_SPADES || "♠️",
+  hearts: process.env.CARD_EMOJI_HEARTS || "♥️",
+  diamonds: process.env.CARD_EMOJI_DIAMONDS || "♦️",
+  clubs: process.env.CARD_EMOJI_CLUBS || "♣️"
+};
+const RANK_EMOJI_NAMES = {
+  A: "ace",
+  "2": "two",
+  "3": "three",
+  "4": "four",
+  "5": "five",
+  "6": "six",
+  "7": "seven",
+  "8": "eight",
+  "9": "nine",
+  "10": "ten",
+  J: "jack",
+  Q: "queen",
+  K: "king"
+};
 const SPIN_FRAMES = ["⚽️↩️", "⚽️↪️"];
 const REVEAL_TICK_MS = 700;
 const REVEAL_TICKS = 4;
@@ -23,7 +45,44 @@ let sessionCounter = 0;
 
 function drawCard() {
   const index = Math.floor(Math.random() * CARD_ORDER.length);
-  return { label: CARD_ORDER[index], value: index + 2 };
+  const suitIndex = Math.floor(Math.random() * CARD_SUITS.length);
+  const rank = CARD_ORDER[index];
+  const suit = CARD_SUITS[suitIndex];
+  return { rank, suit, value: index + 2 };
+}
+
+function buildCardEmojiName(rank, suit) {
+  const rankName = RANK_EMOJI_NAMES[rank];
+  if (!rankName) {
+    return null;
+  }
+
+  const suffix = ["J", "Q", "K"].includes(rank) ? "2" : "";
+  return `${rankName}_of_${suit}${suffix}`;
+}
+
+function resolveCustomCardEmoji(guild, rank, suit) {
+  if (!guild) {
+    return null;
+  }
+
+  const emojiName = buildCardEmojiName(rank, suit);
+  if (!emojiName) {
+    return null;
+  }
+
+  const emoji = guild.emojis.cache.find((item) => item.name === emojiName);
+  return emoji ? emoji.toString() : null;
+}
+
+function formatCardDisplay(card, guild) {
+  const customEmoji = resolveCustomCardEmoji(guild, card.rank, card.suit);
+  if (customEmoji) {
+    return customEmoji;
+  }
+
+  const fallbackSuitEmoji = CARD_SUIT_EMOJIS[card.suit] || "";
+  return `${card.rank}${fallbackSuitEmoji}`;
 }
 
 function buildBetRow(sessionId, round) {
@@ -255,6 +314,8 @@ async function runSession(channel, session) {
 
     const homeCard = drawCard();
     const awayCard = drawCard();
+    const homeDisplay = formatCardDisplay(homeCard, session.guild);
+    const awayDisplay = formatCardDisplay(awayCard, session.guild);
     const result = homeCard.value > awayCard.value
       ? "home"
       : awayCard.value > homeCard.value
@@ -265,8 +326,8 @@ async function runSession(channel, session) {
     const resultEmbed = buildEmbed({
       title: "Kết quả Football Studio 🏁",
       description: [
-        `Home: **${homeCard.label}**`,
-        `Away: **${awayCard.label}**`,
+        `Home: **${homeDisplay}**`,
+        `Away: **${awayDisplay}**`,
         `Kết quả: **${getPickLabel(result)}**`,
         `Số lượt cược: **${bets.length}**`,
         `Thắng: **${settlement.winners}** | Hoàn nửa: **${settlement.refunds}**`,
@@ -304,10 +365,15 @@ module.exports = {
     const session = {
       id: String(++sessionCounter),
       channelId,
+      guild: interaction.guild,
       round: 0,
       idleRounds: 0,
       running: true
     };
+
+    if (interaction.guild) {
+      await interaction.guild.emojis.fetch().catch(() => null);
+    }
     sessions.set(channelId, session);
 
     await interaction.reply({

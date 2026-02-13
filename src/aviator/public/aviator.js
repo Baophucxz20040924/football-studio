@@ -18,8 +18,15 @@ const ui = {
   betStatus1: document.getElementById("betStatus1"),
   betStatus2: document.getElementById("betStatus2"),
   userNote: document.getElementById("userNote"),
-  roundBetsList: document.getElementById("roundBetsList")
+  roundBetsList: document.getElementById("roundBetsList"),
+  chartPath: document.getElementById("chartPath"),
+  chartFill: document.getElementById("chartFill"),
+  planeIcon: document.getElementById("planeIcon")
 };
+
+const CHART_WIDTH = 300;
+const CHART_HEIGHT = 160;
+const CHART_PADDING = 12;
 
 const state = {
   status: "WAITING",
@@ -37,7 +44,12 @@ const state = {
     { amount: 0, autoCashout: 0, placed: false, cashedOut: false, cashoutAt: 0, winAmount: 0, betId: null }
   ],
   userId: "",
-  userName: ""
+  userName: "",
+  chartPoints: [],
+  chartStart: 0,
+  planePos: { x: 0, y: 0 },
+  crashTimerId: null,
+  displayMultiplier: 1
 };
 
 const token = new URLSearchParams(window.location.search).get("token") || "";
@@ -57,6 +69,95 @@ function setStatus(status) {
 
 function updateBalance() {
   ui.balanceValue.textContent = formatMoney(state.balance);
+}
+
+function resetChart() {
+  state.chartPoints = [{ t: 0, m: 1 }];
+  state.chartStart = Date.now();
+  state.planePos = { x: CHART_PADDING, y: CHART_HEIGHT - CHART_PADDING };
+  state.displayMultiplier = 1;
+  renderChart();
+}
+
+function appendChartPoint(multiplier) {
+  if (!state.chartStart) {
+    state.chartStart = Date.now();
+  }
+  const t = (Date.now() - state.chartStart) / 1000;
+  const last = state.chartPoints[state.chartPoints.length - 1];
+  if (last && Math.abs(last.m - multiplier) < 0.001) {
+    return;
+  }
+  state.chartPoints.push({ t, m: multiplier });
+  if (state.chartPoints.length > 240) {
+    state.chartPoints.shift();
+  }
+}
+
+function buildChartPath(points) {
+  if (!points || points.length === 0) {
+    return { line: "", fill: "" };
+  }
+
+  const maxT = Math.max(1, points[points.length - 1].t || 1);
+  const maxM = Math.max(2, ...points.map((p) => p.m));
+  const width = CHART_WIDTH;
+  const height = CHART_HEIGHT;
+  const innerW = width - CHART_PADDING * 2;
+  const innerH = height - CHART_PADDING * 2;
+
+  const coords = points.map((point) => {
+    const x = CHART_PADDING + (point.t / maxT) * innerW;
+    const ratio = (point.m - 1) / (maxM - 1);
+    const y = height - CHART_PADDING - ratio * innerH;
+    return { x, y };
+  });
+
+  if (coords.length === 1) {
+    return { line: "", fill: "", last: coords[0] };
+  }
+
+  const line = coords
+    .map((coord, index) => `${index === 0 ? "M" : "L"}${coord.x.toFixed(2)} ${coord.y.toFixed(2)}`)
+    .join(" ");
+
+  const last = coords[coords.length - 1];
+  const fill = `${line} L${last.x.toFixed(2)} ${height - CHART_PADDING} L${coords[0].x.toFixed(2)} ${height - CHART_PADDING} Z`;
+
+  return { line, fill, last };
+}
+
+function renderChart() {
+  if (!ui.chartPath || !ui.chartFill || !ui.planeIcon) {
+    return;
+  }
+
+  const { line, fill, last } = buildChartPath(state.chartPoints);
+  ui.chartPath.setAttribute("d", line);
+  ui.chartFill.setAttribute("d", fill);
+
+  if (last && (state.status === "FLYING" || state.status === "CRASHED")) {
+    state.planePos = { x: last.x, y: last.y };
+    ui.planeIcon.classList.add("active");
+    ui.planeIcon.style.left = `${(state.planePos.x / CHART_WIDTH) * 100}%`;
+    ui.planeIcon.style.top = `${(state.planePos.y / CHART_HEIGHT) * 100}%`;
+  } else {
+    ui.planeIcon.classList.remove("active");
+  }
+}
+
+function triggerCrashEffect() {
+  if (!ui.planeIcon) {
+    return;
+  }
+  ui.planeIcon.classList.add("crash");
+  if (state.crashTimerId) {
+    clearTimeout(state.crashTimerId);
+  }
+  state.crashTimerId = setTimeout(() => {
+    ui.planeIcon.classList.remove("crash");
+    state.crashTimerId = null;
+  }, 700);
 }
 
 function resetBet(index) {
@@ -150,14 +251,22 @@ function updateDisplay() {
   if (state.status === "WAITING") {
     ui.timerLabel.textContent = "Next round in " + state.countdown.toFixed(1) + "s";
     ui.crashLabel.textContent = "Crash point hidden";
+    if (state.lastStatus !== "WAITING") {
+      resetChart();
+    }
   } else if (state.status === "FLYING") {
     ui.timerLabel.textContent = "Take off...";
     ui.crashLabel.textContent = "Crash point hidden";
+    state.displayMultiplier += (state.multiplier - state.displayMultiplier) * 0.04;
+    appendChartPoint(state.displayMultiplier);
   } else {
     ui.timerLabel.textContent = "Round ended";
     ui.crashLabel.textContent = "Crash at " + formatMultiplier(state.crashPoint || 1);
+    state.displayMultiplier = state.multiplier;
+    appendChartPoint(state.displayMultiplier);
   }
   updateFlightFill();
+  renderChart();
   updateBetButtons();
   updateBalance();
 }
@@ -297,6 +406,14 @@ function handleStateUpdate(snapshot) {
     renderRoundBets([]);
   }
 
+  if (state.status === "FLYING" && state.lastStatus !== "FLYING") {
+    resetChart();
+  }
+
+  if (state.status === "CRASHED" && state.lastStatus !== "CRASHED") {
+    triggerCrashEffect();
+  }
+
   updateDisplay();
 }
 
@@ -368,6 +485,7 @@ loadSession()
   .then(loadHistory)
   .then(() => {
     updateDisplay();
+    resetChart();
     renderRoundBets([]);
     connectStream();
   })

@@ -1,0 +1,423 @@
+const {
+  SlashCommandBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle
+} = require("discord.js");
+const { buildEmbed, normalizeAmount, getOrCreateUser, formatPoints } = require("./utils");
+
+const CARD_RANKS = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+const CARD_SUITS = ["spades", "hearts", "diamonds", "clubs"];
+const CARD_SUIT_EMOJIS = {
+  spades: process.env.CARD_EMOJI_SPADES || "♠️",
+  hearts: process.env.CARD_EMOJI_HEARTS || "♥️",
+  diamonds: process.env.CARD_EMOJI_DIAMONDS || "♦️",
+  clubs: process.env.CARD_EMOJI_CLUBS || "♣️"
+};
+const RANK_EMOJI_NAMES = {
+  A: "ace",
+  "2": "two",
+  "3": "three",
+  "4": "four",
+  "5": "five",
+  "6": "six",
+  "7": "seven",
+  "8": "eight",
+  "9": "nine",
+  "10": "ten",
+  J: "jack",
+  Q: "queen",
+  K: "king"
+};
+const GAME_TIMEOUT_MS = 90_000;
+const DEALER_DRAW_DELAY_MS = 3_000;
+
+function buildCardEmojiName(rank, suit) {
+  const rankName = RANK_EMOJI_NAMES[rank];
+  if (!rankName) {
+    return null;
+  }
+
+  const suffix = ["J", "Q", "K"].includes(rank) ? "2" : "";
+  return `${rankName}_of_${suit}${suffix}`;
+}
+
+function resolveCustomCardEmoji(guild, rank, suit) {
+  if (!guild) {
+    return null;
+  }
+
+  const emojiName = buildCardEmojiName(rank, suit);
+  if (!emojiName) {
+    return null;
+  }
+
+  const emoji = guild.emojis.cache.find((item) => item.name === emojiName);
+  return emoji ? emoji.toString() : null;
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function drawCard(guild) {
+  const rank = CARD_RANKS[Math.floor(Math.random() * CARD_RANKS.length)];
+  const suit = CARD_SUITS[Math.floor(Math.random() * CARD_SUITS.length)];
+  const customEmoji = resolveCustomCardEmoji(guild, rank, suit);
+  const fallbackSuitEmoji = CARD_SUIT_EMOJIS[suit] || "";
+  const display = customEmoji || `${rank}${fallbackSuitEmoji}`;
+  return { rank, suit, emoji: customEmoji || fallbackSuitEmoji, label: display };
+}
+
+function getCardBaseValue(rank) {
+  if (rank === "A") return 11;
+  if (["J", "Q", "K"].includes(rank)) return 10;
+  return Number(rank);
+}
+
+function calculateHandValue(cards) {
+  let total = 0;
+  let aces = 0;
+
+  for (const card of cards) {
+    total += getCardBaseValue(card.rank);
+    if (card.rank === "A") {
+      aces += 1;
+    }
+  }
+
+  while (total > 21 && aces > 0) {
+    total -= 10;
+    aces -= 1;
+  }
+
+  return total;
+}
+
+function isBlackjack(cards) {
+  return cards.length === 2 && calculateHandValue(cards) === 21;
+}
+
+function formatHand(cards) {
+  return cards.map((card) => card.label).join(" ");
+}
+
+function buildControls(gameId) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`bj:${gameId}:hit`)
+      .setLabel("Hit")
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId(`bj:${gameId}:stand`)
+      .setLabel("Stand")
+      .setStyle(ButtonStyle.Secondary)
+  );
+}
+
+function buildDisabledControls(gameId) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`bj:${gameId}:hit`)
+      .setLabel("Hit")
+      .setStyle(ButtonStyle.Primary)
+      .setDisabled(true),
+    new ButtonBuilder()
+      .setCustomId(`bj:${gameId}:stand`)
+      .setLabel("Stand")
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(true)
+  );
+}
+
+function buildGameEmbed({
+  playerName,
+  amount,
+  playerCards,
+  dealerCards,
+  revealDealer,
+  status
+}) {
+  const playerTotal = calculateHandValue(playerCards);
+  const shownDealerCards = revealDealer
+    ? formatHand(dealerCards)
+    : `${dealerCards[0].label} ??`;
+  const dealerTotal = revealDealer ? calculateHandValue(dealerCards) : "?";
+
+  return buildEmbed({
+    title: "Blackjack 🃏",
+    description: [
+      `Người chơi: **${playerName}**`,
+      `Cược: **${formatPoints(amount)}** điểm`,
+      `Dealer: **${shownDealerCards}** (=${dealerTotal})`,
+      `Bạn: **${formatHand(playerCards)}** (=${playerTotal})`,
+      "",
+      status
+    ].join("\n"),
+    color: revealDealer ? 0x6ae4c5 : 0xf6c244
+  });
+}
+
+function settleResult({ playerCards, dealerCards, amount }) {
+  const playerTotal = calculateHandValue(playerCards);
+  const dealerTotal = calculateHandValue(dealerCards);
+  const playerBj = isBlackjack(playerCards);
+  const dealerBj = isBlackjack(dealerCards);
+
+  if (playerTotal > 21) {
+    return { outcome: "lose", payout: 0, message: "Bạn quắc (>21). Thua ván này." };
+  }
+
+  if (playerBj && dealerBj) {
+    return { outcome: "push", payout: amount, message: "Cả hai cùng Blackjack. Hòa (push)." };
+  }
+
+  if (playerBj) {
+    return {
+      outcome: "blackjack",
+      payout: Math.round(amount * 2.5),
+      message: "Blackjack! (A + 10/J/Q/K) trả thưởng 3:2."
+    };
+  }
+
+  if (dealerBj) {
+    return { outcome: "lose", payout: 0, message: "Dealer có Blackjack. Bạn thua." };
+  }
+
+  if (dealerTotal > 21) {
+    return { outcome: "win", payout: amount * 2, message: "Dealer quắc (>21). Bạn thắng!" };
+  }
+
+  if (playerTotal > dealerTotal) {
+    return { outcome: "win", payout: amount * 2, message: "Bạn gần 21 hơn dealer. Bạn thắng!" };
+  }
+
+  if (playerTotal < dealerTotal) {
+    return { outcome: "lose", payout: 0, message: "Dealer gần 21 hơn. Bạn thua." };
+  }
+
+  return { outcome: "push", payout: amount, message: "Bằng điểm dealer. Hòa (push)." };
+}
+
+let gameCounter = 0;
+
+module.exports = {
+  data: new SlashCommandBuilder()
+    .setName("bj")
+    .setDescription("Blackjack - đấu với dealer")
+    .addIntegerOption((opt) =>
+      opt.setName("amount").setDescription("Số điểm cược").setRequired(true)
+    ),
+  async execute(interaction) {
+        if (interaction.guild) {
+          await interaction.guild.emojis.fetch().catch(() => null);
+        }
+
+    if (!interaction.channel) {
+      return interaction.reply({ content: "Lệnh này chỉ dùng trong server.", ephemeral: true });
+    }
+
+    const amount = normalizeAmount(interaction.options.getInteger("amount", true));
+    if (!amount) {
+      return interaction.reply({ content: "Số điểm cược không hợp lệ.", ephemeral: true });
+    }
+
+    const userName = interaction.user.globalName || interaction.user.username;
+    const user = await getOrCreateUser(interaction.user.id, userName);
+    if (user.balance < amount) {
+      return interaction.reply({
+        content: "Không đủ số dư để đặt cược này.",
+        ephemeral: true
+      });
+    }
+
+    user.balance -= amount;
+    await user.save();
+
+    const playerCards = [drawCard(interaction.guild), drawCard(interaction.guild)];
+    const dealerCards = [drawCard(interaction.guild), drawCard(interaction.guild)];
+    const gameId = `${interaction.id}-${++gameCounter}`;
+
+    const initialPlayerBj = isBlackjack(playerCards);
+    const initialDealerBj = isBlackjack(dealerCards);
+    const immediateEnd = initialPlayerBj || initialDealerBj;
+
+    if (immediateEnd) {
+      const settlement = settleResult({ playerCards, dealerCards, amount });
+      if (settlement.payout > 0) {
+        user.balance += settlement.payout;
+        await user.save();
+      }
+
+      const embed = buildGameEmbed({
+        playerName: userName,
+        amount,
+        playerCards,
+        dealerCards,
+        revealDealer: true,
+        status: settlement.message
+      });
+
+      return interaction.reply({ embeds: [embed] });
+    }
+
+    const replyMessage = await interaction.reply({
+      embeds: [
+        buildGameEmbed({
+          playerName: userName,
+          amount,
+          playerCards,
+          dealerCards,
+          revealDealer: false,
+          status: "Bấm **Hit** để rút thêm, hoặc **Stand** để dừng."
+        })
+      ],
+      components: [buildControls(gameId)],
+      fetchReply: true
+    });
+
+    let finished = false;
+
+    const endGame = async (statusMessage) => {
+      if (finished) {
+        return;
+      }
+      finished = true;
+
+      const playerTotal = calculateHandValue(playerCards);
+      const needsDealerPlay = playerTotal <= 21;
+
+      if (needsDealerPlay) {
+        await replyMessage.edit({
+          embeds: [
+            buildGameEmbed({
+              playerName: userName,
+              amount,
+              playerCards,
+              dealerCards,
+              revealDealer: true,
+              status: `${statusMessage}\nDealer lật bài...`
+            })
+          ],
+          components: [buildDisabledControls(gameId)]
+        });
+
+        await sleep(DEALER_DRAW_DELAY_MS);
+
+        while (calculateHandValue(dealerCards) < 17) {
+          dealerCards.push(drawCard(interaction.guild));
+
+          await replyMessage.edit({
+            embeds: [
+              buildGameEmbed({
+                playerName: userName,
+                amount,
+                playerCards,
+                dealerCards,
+                revealDealer: true,
+                status: `${statusMessage}\nDealer rút thêm 1 lá...`
+              })
+            ],
+            components: [buildDisabledControls(gameId)]
+          });
+
+          await sleep(DEALER_DRAW_DELAY_MS);
+        }
+      }
+
+      const settlement = settleResult({ playerCards, dealerCards, amount });
+      if (settlement.payout > 0) {
+        user.balance += settlement.payout;
+        await user.save();
+      }
+
+      const summary = [
+        statusMessage,
+        settlement.message
+      ].join("\n");
+
+      await replyMessage.edit({
+        embeds: [
+          buildGameEmbed({
+            playerName: userName,
+            amount,
+            playerCards,
+            dealerCards,
+            revealDealer: true,
+            status: summary
+          })
+        ],
+        components: [buildDisabledControls(gameId)]
+      });
+    };
+
+    const collector = replyMessage.createMessageComponentCollector({
+      time: GAME_TIMEOUT_MS
+    });
+
+    collector.on("collect", async (btn) => {
+      const [prefix, targetGameId, action] = btn.customId.split(":");
+      if (prefix !== "bj" || targetGameId !== gameId) {
+        await btn.reply({ content: "Ván này đã hết hạn.", ephemeral: true });
+        return;
+      }
+
+      if (btn.user.id !== interaction.user.id) {
+        await btn.reply({ content: "Chỉ người tạo ván mới được bấm nút.", ephemeral: true });
+        return;
+      }
+
+      if (finished) {
+        await btn.reply({ content: "Ván đã kết thúc.", ephemeral: true });
+        return;
+      }
+
+      await btn.deferUpdate();
+
+      if (action === "hit") {
+        playerCards.push(drawCard(interaction.guild));
+        const total = calculateHandValue(playerCards);
+
+        if (total > 21) {
+          collector.stop("player-bust");
+          await endGame("Bạn đã chọn **Hit**.");
+          return;
+        }
+
+        if (total === 21) {
+          collector.stop("auto-stand");
+          await endGame("Bạn đạt **21**. Tự động Stand.");
+          return;
+        }
+
+        await replyMessage.edit({
+          embeds: [
+            buildGameEmbed({
+              playerName: userName,
+              amount,
+              playerCards,
+              dealerCards,
+              revealDealer: false,
+              status: "Bạn vừa **Hit**. Tiếp tục Hit hoặc Stand."
+            })
+          ],
+          components: [buildControls(gameId)]
+        });
+        return;
+      }
+
+      collector.stop("player-stand");
+      await endGame("Bạn đã chọn **Stand**.");
+    });
+
+    collector.on("end", async (_collected, reason) => {
+      if (finished) {
+        return;
+      }
+
+      if (reason === "time") {
+        await endGame("Hết thời gian thao tác. Tự động **Stand**.");
+      }
+    });
+  }
+};

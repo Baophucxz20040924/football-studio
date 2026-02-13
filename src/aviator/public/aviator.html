@@ -26,6 +26,13 @@
             <div class="crash-label" id="crashLabel">Crash point hidden</div>
           </div>
           <div class="board-center">
+            <div class="flight-chart" aria-hidden="true">
+              <svg class="chart-svg" viewBox="0 0 300 160" preserveAspectRatio="none">
+                <path class="chart-fill" id="chartFill" d="" />
+                <path class="chart-path" id="chartPath" d="" />
+              </svg>
+              <div class="plane" id="planeIcon">✈️</div>
+            </div>
             <div class="timer" id="timerLabel">Next round in <span id="countdownValue">3.0</span>s</div>
             <div class="flight-bar">
               <div class="flight-fill" id="flightFill"></div>

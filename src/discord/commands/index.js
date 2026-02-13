@@ -9,6 +9,7 @@ const commands = [
   require("./aviator"),
   require("./football"),
   require("./bcr"),
+  require("./bj"),
   require("./tx"),
   require("./helpfootball"),
   require("./helpbcr"),

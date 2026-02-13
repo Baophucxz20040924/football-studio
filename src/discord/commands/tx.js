@@ -12,6 +12,7 @@ const { buildEmbed, normalizeAmount, getOrCreateUser, formatPoints } = require("
 const BET_WINDOW_MS = 30_000;
 const MAX_IDLE_ROUNDS = 4;
 const DICE_FACES = ["⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
+const DICE_REVEAL_DELAY_MS = 3000;
 
 const NUMBER_ODDS = new Map([
   [3, 100],
@@ -135,6 +136,19 @@ function buildResultEmbed(round, roll, settlement) {
       `Tổng trả thưởng: **${formatPoints(settlement.totalPayout)}**`
     ].join("\n"),
     color: 0x6ae4c5
+  });
+}
+
+function buildRevealEmbed(round, faces, revealedCount) {
+  const slots = [0, 1, 2].map((index) => (index < revealedCount ? faces[index] : "❔")).join(" ");
+  return buildEmbed({
+    title: "Tài Xỉu 🎲",
+    description: [
+      `Phiên: **${round}**`,
+      "Đang mở xúc xắc...",
+      `Kết quả: ${slots}`
+    ].join("\n"),
+    color: 0xf6c244
   });
 }
 
@@ -326,6 +340,15 @@ async function runSession(channel, session) {
     }
 
     const roll = rollDice();
+    for (let i = 1; i <= 3; i += 1) {
+      const revealEmbed = buildRevealEmbed(round, roll.faces, i);
+      await message.edit({
+        embeds: [revealEmbed],
+        components: [buildDisabledRow(session.id, round)]
+      }).catch(() => null);
+      await new Promise((resolve) => setTimeout(resolve, DICE_REVEAL_DELAY_MS));
+    }
+
     const settlement = await settleBets(bets, roll);
     const resultEmbed = buildResultEmbed(round, roll, settlement);
 

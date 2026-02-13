@@ -33,89 +33,66 @@ const CARD_VALUES = new Map([
   ["Q", 0],
   ["K", 0]
 ]);
-const CARD_EMOJIS = {
-  spades: {
-    A: "🂡",
-    "2": "🂢",
-    "3": "🂣",
-    "4": "🂤",
-    "5": "🂥",
-    "6": "🂦",
-    "7": "🂧",
-    "8": "🂨",
-    "9": "🂩",
-    "10": "🂪",
-    J: "🂫",
-    Q: "🂭",
-    K: "🂮"
-  },
-  hearts: {
-    A: "🂱",
-    "2": "🂲",
-    "3": "🂳",
-    "4": "🂴",
-    "5": "🂵",
-    "6": "🂶",
-    "7": "🂷",
-    "8": "🂸",
-    "9": "🂹",
-    "10": "🂺",
-    J: "🂻",
-    Q: "🂽",
-    K: "🂾"
-  },
-  diamonds: {
-    A: "🃁",
-    "2": "🃂",
-    "3": "🃃",
-    "4": "🃄",
-    "5": "🃅",
-    "6": "🃆",
-    "7": "🃇",
-    "8": "🃈",
-    "9": "🃉",
-    "10": "🃊",
-    J: "🃋",
-    Q: "🃍",
-    K: "🃎"
-  },
-  clubs: {
-    A: "🃑",
-    "2": "🃒",
-    "3": "🃓",
-    "4": "🃔",
-    "5": "🃕",
-    "6": "🃖",
-    "7": "🃗",
-    "8": "🃘",
-    "9": "🃙",
-    "10": "🃚",
-    J: "🃛",
-    Q: "🃝",
-    K: "🃞"
-  }
+const CARD_SUIT_EMOJIS = {
+  spades: process.env.CARD_EMOJI_SPADES || "♠️",
+  hearts: process.env.CARD_EMOJI_HEARTS || "♥️",
+  diamonds: process.env.CARD_EMOJI_DIAMONDS || "♦️",
+  clubs: process.env.CARD_EMOJI_CLUBS || "♣️"
+};
+const RANK_EMOJI_NAMES = {
+  A: "ace",
+  "2": "two",
+  "3": "three",
+  "4": "four",
+  "5": "five",
+  "6": "six",
+  "7": "seven",
+  "8": "eight",
+  "9": "nine",
+  "10": "ten",
+  J: "jack",
+  Q: "queen",
+  K: "king"
 };
 const CARD_LABELS = Array.from(CARD_VALUES.keys());
-const CARD_SUITS = Object.keys(CARD_EMOJIS);
+const CARD_SUITS = Object.keys(CARD_SUIT_EMOJIS);
 
 const sessions = new Map();
 let sessionCounter = 0;
 
-const SUIT_SYMBOLS = {
-  spades: "♠",
-  hearts: "♥",
-  diamonds: "♦",
-  clubs: "♣"
-};
+function buildCardEmojiName(rank, suit) {
+  const rankName = RANK_EMOJI_NAMES[rank];
+  if (!rankName) {
+    return null;
+  }
 
-function drawCard() {
+  const suffix = ["J", "Q", "K"].includes(rank) ? "2" : "";
+  return `${rankName}_of_${suit}${suffix}`;
+}
+
+function resolveCustomCardEmoji(guild, rank, suit) {
+  if (!guild) {
+    return null;
+  }
+
+  const emojiName = buildCardEmojiName(rank, suit);
+  if (!emojiName) {
+    return null;
+  }
+
+  const emoji = guild.emojis.cache.find((item) => item.name === emojiName);
+  return emoji ? emoji.toString() : null;
+}
+
+function drawCard(guild) {
   const rankIndex = Math.floor(Math.random() * CARD_LABELS.length);
   const suitIndex = Math.floor(Math.random() * CARD_SUITS.length);
   const label = CARD_LABELS[rankIndex];
   const suit = CARD_SUITS[suitIndex];
-  const emoji = CARD_EMOJIS[suit][label];
-  const symbol = SUIT_SYMBOLS[suit];
-  return { label, value: CARD_VALUES.get(label), emoji, symbol, display: `${emoji}${label}${symbol}` };
+  const customEmoji = resolveCustomCardEmoji(guild, label, suit);
+  const fallbackSuitEmoji = CARD_SUIT_EMOJIS[suit] || "";
+  const display = customEmoji || `${label}${fallbackSuitEmoji}`;
+  return { label, value: CARD_VALUES.get(label), emoji: customEmoji || fallbackSuitEmoji, display };
 }
 
 function totalPoints(cards) {
@@ -255,12 +232,12 @@ async function settleBets(bets, result) {
   return { totalPayout, winners, betCount: bets.length };
 }
 
-async function playRoundAnimated(message, sessionId, round) {
+async function playRoundAnimated(message, sessionId, round, guild) {
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const CARD_DELAY = 2000;
 
   // Player draws 2 cards
-  const playerCards = [drawCard()];
+  const playerCards = [drawCard(guild)];
   let playerLabel = playerCards.map((c) => c.display).join(" ");
   let embed = buildEmbed({
     title: "Baccarat 🎴",
@@ -270,7 +247,7 @@ async function playRoundAnimated(message, sessionId, round) {
   await message.edit({ embeds: [embed] }).catch(() => null);
   await delay(CARD_DELAY);
 
-  playerCards.push(drawCard());
+  playerCards.push(drawCard(guild));
   playerLabel = playerCards.map((c) => c.display).join(" ");
   let playerTotal = totalPoints(playerCards);
   embed = buildEmbed({
@@ -282,7 +259,7 @@ async function playRoundAnimated(message, sessionId, round) {
   await delay(CARD_DELAY);
 
   // Banker draws 2 cards
-  const bankerCards = [drawCard()];
+  const bankerCards = [drawCard(guild)];
   let bankerLabel = bankerCards.map((c) => c.display).join(" ");
   embed = buildEmbed({
     title: "Baccarat 🎴",
@@ -296,7 +273,7 @@ async function playRoundAnimated(message, sessionId, round) {
   await message.edit({ embeds: [embed] }).catch(() => null);
   await delay(CARD_DELAY);
 
-  bankerCards.push(drawCard());
+  bankerCards.push(drawCard(guild));
   bankerLabel = bankerCards.map((c) => c.display).join(" ");
   let bankerTotal = totalPoints(bankerCards);
   embed = buildEmbed({
@@ -316,7 +293,7 @@ async function playRoundAnimated(message, sessionId, round) {
 
   // Check player draw
   if (!natural && shouldPlayerDraw(playerTotal)) {
-    playerThird = drawCard();
+    playerThird = drawCard(guild);
     playerCards.push(playerThird);
     playerTotal = totalPoints(playerCards);
     playerLabel = playerCards.map((c) => c.display).join(" ");
@@ -335,7 +312,7 @@ async function playRoundAnimated(message, sessionId, round) {
 
   // Check banker draw
   if (!natural && shouldBankerDraw(bankerTotal, playerThird?.value, Boolean(playerThird))) {
-    bankerCards.push(drawCard());
+    bankerCards.push(drawCard(guild));
     bankerTotal = totalPoints(bankerCards);
     bankerLabel = bankerCards.map((c) => c.display).join(" ");
     embed = buildEmbed({
@@ -480,7 +457,7 @@ async function runSession(channel, session) {
       await new Promise((resolve) => setTimeout(resolve, REVEAL_TICK_MS));
     }
 
-    const roundResult = await playRoundAnimated(message, session.id, round);
+    const roundResult = await playRoundAnimated(message, session.id, round, session.guild);
     const settlement = await settleBets(bets, roundResult.result);
     const resultEmbed = buildResultEmbed(
       round,
@@ -519,10 +496,15 @@ module.exports = {
     const session = {
       id: String(++sessionCounter),
       channelId,
+      guild: interaction.guild,
       round: 0,
       idleRounds: 0,
       running: true
     };
+
+    if (interaction.guild) {
+      await interaction.guild.emojis.fetch().catch(() => null);
+    }
     sessions.set(channelId, session);
 
     await interaction.reply({

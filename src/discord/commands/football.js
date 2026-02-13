@@ -39,6 +39,7 @@ const RANK_WORD_NAMES = {
 const SPIN_FRAMES = ["⚽️↩️", "⚽️↪️"];
 const REVEAL_TICK_MS = 700;
 const REVEAL_TICKS = 4;
+const CARD_REVEAL_DELAY_MS = 1_500;
 
 const sessions = new Map();
 let sessionCounter = 0;
@@ -182,6 +183,52 @@ function buildRevealEmbed(round, frame) {
     ].join("\n"),
     color: 0xf6c244
   });
+}
+
+async function playRoundAnimated(message, round, guild) {
+  const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  const homeCard = drawCard();
+  const homeDisplay = formatCardDisplay(homeCard, guild);
+
+  await message.edit({
+    embeds: [
+      buildEmbed({
+        title: "Football Studio ⚽",
+        description: [
+          `Round: **${round}**`,
+          `Home rút: **${homeDisplay}**`,
+          "Away rút: **?**"
+        ].join("\n"),
+        color: 0xf6c244
+      })
+    ],
+    components: []
+  }).catch(() => null);
+
+  await delay(CARD_REVEAL_DELAY_MS);
+
+  const awayCard = drawCard();
+  const awayDisplay = formatCardDisplay(awayCard, guild);
+
+  await message.edit({
+    embeds: [
+      buildEmbed({
+        title: "Football Studio ⚽",
+        description: [
+          `Round: **${round}**`,
+          `Home: **${homeDisplay}**`,
+          `Away rút: **${awayDisplay}**`
+        ].join("\n"),
+        color: 0xf6c244
+      })
+    ],
+    components: []
+  }).catch(() => null);
+
+  await delay(CARD_REVEAL_DELAY_MS);
+
+  return { homeCard, awayCard, homeDisplay, awayDisplay };
 }
 
 async function settleBets(bets, result) {
@@ -346,10 +393,11 @@ async function runSession(channel, session) {
       await new Promise((resolve) => setTimeout(resolve, REVEAL_TICK_MS));
     }
 
-    const homeCard = drawCard();
-    const awayCard = drawCard();
-    const homeDisplay = formatCardDisplay(homeCard, session.guild);
-    const awayDisplay = formatCardDisplay(awayCard, session.guild);
+    const { homeCard, awayCard, homeDisplay, awayDisplay } = await playRoundAnimated(
+      message,
+      round,
+      session.guild
+    );
     const result = homeCard.value > awayCard.value
       ? "home"
       : awayCard.value > homeCard.value

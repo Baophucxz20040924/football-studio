@@ -170,6 +170,63 @@ function buildGameEmbed({
   });
 }
 
+function isCustomEmoji(value) {
+  return /^<a?:\w+:\d+>$/.test(value);
+}
+
+function buildJumboCardBoard(playerCards, dealerCards, revealDealer) {
+  const visibleDealerCards = revealDealer ? dealerCards : dealerCards.slice(0, 1);
+  const visibleCards = [...playerCards, ...visibleDealerCards];
+  if (visibleCards.length === 0 || visibleCards.some((card) => !isCustomEmoji(card.emoji))) {
+    return null;
+  }
+
+  const dealerLine = revealDealer
+    ? ["🟥", ...dealerCards.map((card) => card.emoji)].join(" ")
+    : ["🟥", dealerCards[0].emoji, "❓"].join(" ");
+  const playerLine = ["🟦", ...playerCards.map((card) => card.emoji)].join(" ");
+  return [dealerLine, playerLine].join("\n");
+}
+
+function buildGameMessagePayload({
+  playerName,
+  amount,
+  playerCards,
+  dealerCards,
+  revealDealer,
+  status,
+  components,
+  fetchReply
+}) {
+  const payload = {
+    embeds: [
+      buildGameEmbed({
+        playerName,
+        amount,
+        playerCards,
+        dealerCards,
+        revealDealer,
+        status
+      })
+    ]
+  };
+
+  const jumboCardBoard = buildJumboCardBoard(playerCards, dealerCards, revealDealer);
+  if (jumboCardBoard) {
+    payload.content = jumboCardBoard;
+  }
+
+  if (components) {
+    payload.components = components;
+  }
+
+  if (fetchReply) {
+    payload.fetchReply = true;
+  }
+
+  return payload;
+}
+
 function settleResult({ playerCards, dealerCards, amount }) {
   const playerTotal = calculateHandValue(playerCards);
   const dealerTotal = calculateHandValue(dealerCards);
@@ -261,32 +318,26 @@ module.exports = {
         await user.save();
       }
 
-      const embed = buildGameEmbed({
+      return interaction.reply(buildGameMessagePayload({
         playerName: userName,
         amount,
         playerCards,
         dealerCards,
         revealDealer: true,
         status: settlement.message
-      });
-
-      return interaction.reply({ embeds: [embed] });
+      }));
     }
 
-    const replyMessage = await interaction.reply({
-      embeds: [
-        buildGameEmbed({
-          playerName: userName,
-          amount,
-          playerCards,
-          dealerCards,
-          revealDealer: false,
-          status: "Bấm **Hit** để rút thêm, hoặc **Stand** để dừng."
-        })
-      ],
+    const replyMessage = await interaction.reply(buildGameMessagePayload({
+      playerName: userName,
+      amount,
+      playerCards,
+      dealerCards,
+      revealDealer: false,
+      status: "Bấm **Hit** để rút thêm, hoặc **Stand** để dừng.",
       components: [buildControls(gameId)],
       fetchReply: true
-    });
+    }));
 
     let finished = false;
 
@@ -300,38 +351,30 @@ module.exports = {
       const needsDealerPlay = playerTotal <= 21;
 
       if (needsDealerPlay) {
-        await replyMessage.edit({
-          embeds: [
-            buildGameEmbed({
-              playerName: userName,
-              amount,
-              playerCards,
-              dealerCards,
-              revealDealer: true,
-              status: `${statusMessage}\nDealer lật bài...`
-            })
-          ],
+        await replyMessage.edit(buildGameMessagePayload({
+          playerName: userName,
+          amount,
+          playerCards,
+          dealerCards,
+          revealDealer: true,
+          status: `${statusMessage}\nDealer lật bài...`,
           components: [buildDisabledControls(gameId)]
-        });
+        }));
 
         await sleep(DEALER_DRAW_DELAY_MS);
 
         while (calculateHandValue(dealerCards) < 17) {
           dealerCards.push(drawCard(interaction.guild));
 
-          await replyMessage.edit({
-            embeds: [
-              buildGameEmbed({
-                playerName: userName,
-                amount,
-                playerCards,
-                dealerCards,
-                revealDealer: true,
-                status: `${statusMessage}\nDealer rút thêm 1 lá...`
-              })
-            ],
+          await replyMessage.edit(buildGameMessagePayload({
+            playerName: userName,
+            amount,
+            playerCards,
+            dealerCards,
+            revealDealer: true,
+            status: `${statusMessage}\nDealer rút thêm 1 lá...`,
             components: [buildDisabledControls(gameId)]
-          });
+          }));
 
           await sleep(DEALER_DRAW_DELAY_MS);
         }
@@ -348,19 +391,15 @@ module.exports = {
         settlement.message
       ].join("\n");
 
-      await replyMessage.edit({
-        embeds: [
-          buildGameEmbed({
-            playerName: userName,
-            amount,
-            playerCards,
-            dealerCards,
-            revealDealer: true,
-            status: summary
-          })
-        ],
+      await replyMessage.edit(buildGameMessagePayload({
+        playerName: userName,
+        amount,
+        playerCards,
+        dealerCards,
+        revealDealer: true,
+        status: summary,
         components: [buildDisabledControls(gameId)]
-      });
+      }));
     };
 
     const collector = replyMessage.createMessageComponentCollector({
@@ -402,19 +441,15 @@ module.exports = {
           return;
         }
 
-        await replyMessage.edit({
-          embeds: [
-            buildGameEmbed({
-              playerName: userName,
-              amount,
-              playerCards,
-              dealerCards,
-              revealDealer: false,
-              status: "Bạn vừa **Hit**. Tiếp tục Hit hoặc Stand."
-            })
-          ],
+        await replyMessage.edit(buildGameMessagePayload({
+          playerName: userName,
+          amount,
+          playerCards,
+          dealerCards,
+          revealDealer: false,
+          status: "Bạn vừa **Hit**. Tiếp tục Hit hoặc Stand.",
           components: [buildControls(gameId)]
-        });
+        }));
         return;
       }
 

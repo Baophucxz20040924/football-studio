@@ -39,7 +39,7 @@ const CARD_SUIT_EMOJIS = {
   diamonds: process.env.CARD_EMOJI_DIAMONDS || "♦️",
   clubs: process.env.CARD_EMOJI_CLUBS || "♣️"
 };
-const RANK_EMOJI_NAMES = {
+const RANK_WORD_NAMES = {
   A: "ace",
   "2": "two",
   "3": "three",
@@ -60,14 +60,24 @@ const CARD_SUITS = Object.keys(CARD_SUIT_EMOJIS);
 const sessions = new Map();
 let sessionCounter = 0;
 
-function buildCardEmojiName(rank, suit) {
-  const rankName = RANK_EMOJI_NAMES[rank];
-  if (!rankName) {
-    return null;
+function buildCardEmojiCandidates(rank, suit) {
+  const rankWordName = RANK_WORD_NAMES[rank];
+  const rankLower = String(rank).toLowerCase();
+  const isFace = ["J", "Q", "K"].includes(rank);
+  const suffixes = isFace ? ["2", ""] : [""];
+  const rankTokens = [];
+
+  if (rankWordName) {
+    rankTokens.push(rankWordName);
   }
 
-  const suffix = ["J", "Q", "K"].includes(rank) ? "2" : "";
-  return `${rankName}_of_${suit}${suffix}`;
+  rankTokens.push(rankLower);
+
+  if (/^\d+$/.test(rankLower)) {
+    rankTokens.push(rankLower);
+  }
+
+  return [...new Set(rankTokens.flatMap((token) => suffixes.map((suffix) => `${token}_of_${suit}${suffix}`)))];
 }
 
 function resolveCustomCardEmoji(guild, rank, suit) {
@@ -75,13 +85,15 @@ function resolveCustomCardEmoji(guild, rank, suit) {
     return null;
   }
 
-  const emojiName = buildCardEmojiName(rank, suit);
-  if (!emojiName) {
-    return null;
+  const candidates = buildCardEmojiCandidates(rank, suit);
+  for (const emojiName of candidates) {
+    const emoji = guild.emojis.cache.find((item) => item.name === emojiName);
+    if (emoji) {
+      return emoji.toString();
+    }
   }
 
-  const emoji = guild.emojis.cache.find((item) => item.name === emojiName);
-  return emoji ? emoji.toString() : null;
+  return null;
 }
 
 function drawCard(guild) {
@@ -187,6 +199,21 @@ function buildResultEmbed(round, playerCards, bankerCards, result, settlement) {
     ].join("\n"),
     color: result === "tie" ? 0xf6c244 : 0x6ae4c5
   });
+}
+
+function isCustomEmoji(value) {
+  return /^<a?:\w+:\d+>$/.test(value);
+}
+
+function buildJumboCardBoard(playerCards, bankerCards) {
+  const allCards = [...playerCards, ...bankerCards];
+  if (allCards.length === 0 || allCards.some((card) => !isCustomEmoji(card.emoji))) {
+    return null;
+  }
+
+  const playerLine = ["🟦", ...playerCards.map((card) => card.emoji)].join(" ");
+  const bankerLine = ["🟥", ...bankerCards.map((card) => card.emoji)].join(" ");
+  return [playerLine, bankerLine].join("\n");
 }
 
 function shouldPlayerDraw(total) {
@@ -473,8 +500,11 @@ async function runSession(channel, session) {
       roundResult.result,
       settlement
     );
+    const jumboCardBoard = buildJumboCardBoard(roundResult.playerCards, roundResult.bankerCards);
 
-    await channel.send({ embeds: [resultEmbed] });
+    await channel.send(jumboCardBoard
+      ? { content: jumboCardBoard, embeds: [resultEmbed] }
+      : { embeds: [resultEmbed] });
 
     if (noPlayers && session.idleRounds >= MAX_IDLE_ROUNDS) {
       session.running = false;

@@ -14,7 +14,7 @@ const CARD_SUIT_EMOJIS = {
   diamonds: process.env.CARD_EMOJI_DIAMONDS || "♦️",
   clubs: process.env.CARD_EMOJI_CLUBS || "♣️"
 };
-const RANK_EMOJI_NAMES = {
+const RANK_WORD_NAMES = {
   A: "ace",
   "2": "two",
   "3": "three",
@@ -32,14 +32,24 @@ const RANK_EMOJI_NAMES = {
 const GAME_TIMEOUT_MS = 90_000;
 const DEALER_DRAW_DELAY_MS = 3_000;
 
-function buildCardEmojiName(rank, suit) {
-  const rankName = RANK_EMOJI_NAMES[rank];
-  if (!rankName) {
-    return null;
+function buildCardEmojiCandidates(rank, suit) {
+  const rankWordName = RANK_WORD_NAMES[rank];
+  const rankLower = String(rank).toLowerCase();
+  const isFace = ["J", "Q", "K"].includes(rank);
+  const suffixes = isFace ? ["2", ""] : [""];
+  const rankTokens = [];
+
+  if (rankWordName) {
+    rankTokens.push(rankWordName);
   }
 
-  const suffix = ["J", "Q", "K"].includes(rank) ? "2" : "";
-  return `${rankName}_of_${suit}${suffix}`;
+  rankTokens.push(rankLower);
+
+  if (/^\d+$/.test(rankLower)) {
+    rankTokens.push(rankLower);
+  }
+
+  return [...new Set(rankTokens.flatMap((token) => suffixes.map((suffix) => `${token}_of_${suit}${suffix}`)))];
 }
 
 function resolveCustomCardEmoji(guild, rank, suit) {
@@ -47,13 +57,15 @@ function resolveCustomCardEmoji(guild, rank, suit) {
     return null;
   }
 
-  const emojiName = buildCardEmojiName(rank, suit);
-  if (!emojiName) {
-    return null;
+  const candidates = buildCardEmojiCandidates(rank, suit);
+  for (const emojiName of candidates) {
+    const emoji = guild.emojis.cache.find((item) => item.name === emojiName);
+    if (emoji) {
+      return emoji.toString();
+    }
   }
 
-  const emoji = guild.emojis.cache.find((item) => item.name === emojiName);
-  return emoji ? emoji.toString() : null;
+  return null;
 }
 
 function sleep(ms) {

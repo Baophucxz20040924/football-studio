@@ -97,6 +97,21 @@ function formatCardDisplay(card, guild) {
   return `${card.rank}${fallbackSuitEmoji}`;
 }
 
+function isCustomEmoji(value) {
+  return /^<a?:\w+:\d+>$/.test(value);
+}
+
+function buildJumboFootballBoard(homeDisplay, awayDisplay) {
+  if (!isCustomEmoji(homeDisplay) || !isCustomEmoji(awayDisplay)) {
+    return null;
+  }
+
+  return [
+    ["🏠", homeDisplay].join(" "),
+    ["🛫", awayDisplay].join(" ")
+  ].join("\n");
+}
+
 function buildBetRow(sessionId, round) {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
@@ -342,6 +357,7 @@ async function runSession(channel, session) {
         : "draw";
 
     const settlement = await settleBets(bets, result);
+    const jumboBoard = buildJumboFootballBoard(homeDisplay, awayDisplay);
     const resultEmbed = buildEmbed({
       title: "Kết quả Football Studio 🏁",
       description: [
@@ -355,7 +371,9 @@ async function runSession(channel, session) {
       color: result === "draw" ? 0xf6c244 : 0x6ae4c5
     });
 
-    await channel.send({ embeds: [resultEmbed] });
+    await channel.send(jumboBoard
+      ? { content: jumboBoard, embeds: [resultEmbed] }
+      : { embeds: [resultEmbed] });
 
     if (noPlayers && session.idleRounds >= MAX_IDLE_ROUNDS) {
       session.running = false;

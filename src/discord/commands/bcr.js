@@ -372,7 +372,7 @@ async function runSession(channel, session) {
         return;
       }
 
-      const modalId = `bcrm:${sessionId}:${round}:${btn.user.id}:${pick}`;
+      const modalId = `bcrm:${sessionId}:${round}:${btn.user.id}:${pick}:${btn.id}`;
       const modal = new ModalBuilder()
         .setCustomId(modalId)
         .setTitle("Đặt cược Baccarat");
@@ -397,7 +397,14 @@ async function runSession(channel, session) {
         return;
       }
 
-      await submitted.deferReply({ ephemeral: true });
+      try {
+        await submitted.deferReply({ ephemeral: true });
+      } catch (error) {
+        if (error?.code === 40060) {
+          return;
+        }
+        throw error;
+      }
 
       const amount = normalizeAmount(submitted.fields.getTextInputValue("amount").trim());
       if (!amount) {

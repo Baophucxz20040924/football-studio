@@ -227,7 +227,7 @@ async function runSession(channel, session) {
         return;
       }
 
-      const modalId = `fbm:${sessionId}:${round}:${btn.user.id}:${pick}`;
+      const modalId = `fbm:${sessionId}:${round}:${btn.user.id}:${pick}:${btn.id}`;
       const modal = new ModalBuilder()
         .setCustomId(modalId)
         .setTitle("Đặt cược Football");
@@ -252,7 +252,14 @@ async function runSession(channel, session) {
         return;
       }
 
-      await submitted.deferReply({ ephemeral: true });
+      try {
+        await submitted.deferReply({ ephemeral: true });
+      } catch (error) {
+        if (error?.code === 40060) {
+          return;
+        }
+        throw error;
+      }
 
       const amount = normalizeAmount(submitted.fields.getTextInputValue("amount").trim());
       if (!amount) {

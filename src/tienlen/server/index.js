@@ -3,12 +3,12 @@ const express = require('express')
 const http = require('http')
 const cors = require('cors')
 const { Server } = require('socket.io')
-const mongoose = require('mongoose')
 
 require('dotenv').config({ path: path.resolve(__dirname, '../../../.env') })
 
 const { buildDeck, shuffleDeck, sortCards, detectCombo, canBeat, parseCard } = require('./gameLogic')
 const User = require('../../models/User')
+const mongoose = User.base
 const { verifyTienLenToken } = require('../token')
 
 const app = express()

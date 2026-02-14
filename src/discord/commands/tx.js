@@ -424,7 +424,7 @@ async function runSession(channel, session) {
     const settlement = await settleBets(bets, roll);
     const resultEmbed = buildResultEmbed(round, roll, settlement);
 
-    await channel.send({ content: roll.faces.join(" "), embeds: [resultEmbed] });
+    await channel.send({ embeds: [resultEmbed] });
 
     if (noPlayers && session.idleRounds >= MAX_IDLE_ROUNDS) {
       session.running = false;

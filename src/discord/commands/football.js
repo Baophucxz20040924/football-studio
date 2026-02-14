@@ -40,6 +40,25 @@ const SPIN_FRAMES = ["⚽️↩️", "⚽️↪️"];
 const REVEAL_TICK_MS = 700;
 const REVEAL_TICKS = 4;
 const CARD_REVEAL_DELAY_MS = 1_500;
+const TEAM_EMOJI_NAMES = [
+  "Wolverhampton_Wanderers_FC",
+  "Nottingham_Forest_FC",
+  "Tottenham_Hotspur_FC",
+  "Brighton_FC",
+  "Crystal_Palace_FC",
+  "Fulham_FC",
+  "Sunderland_FC",
+  "Newcastle_United_FC",
+  "Bournemouth_FC",
+  "Everton_FC",
+  "Brentford_FC",
+  "Liverpool_FC",
+  "Chelsea_FC",
+  "Aston_Villa_FC",
+  "MC_FC",
+  "Arsenal_FC",
+  "MU_FC"
+];
 
 const sessions = new Map();
 let sessionCounter = 0;
@@ -107,10 +126,37 @@ function buildJumboFootballBoard(homeDisplay, awayDisplay) {
     return null;
   }
 
-  return [
-    ["🏠", homeDisplay].join(" "),
-    ["🛫", awayDisplay].join(" ")
-  ].join("\n");
+  return `⚽ Trận đấu: ${homeDisplay} vs ${awayDisplay}`;
+}
+
+function getRandomTeamMatchup(guild) {
+  if (!guild) {
+    return { homeTeamDisplay: "🏠", awayTeamDisplay: "🛫" };
+  }
+
+  const available = TEAM_EMOJI_NAMES
+    .map((emojiName) => guild.emojis.cache.find((item) => item.name === emojiName))
+    .filter(Boolean)
+    .map((emoji) => emoji.toString());
+
+  if (available.length === 0) {
+    return { homeTeamDisplay: "🏠", awayTeamDisplay: "🛫" };
+  }
+
+  if (available.length === 1) {
+    return { homeTeamDisplay: available[0], awayTeamDisplay: available[0] };
+  }
+
+  const homeIndex = Math.floor(Math.random() * available.length);
+  let awayIndex = Math.floor(Math.random() * available.length);
+  while (awayIndex === homeIndex) {
+    awayIndex = Math.floor(Math.random() * available.length);
+  }
+
+  return {
+    homeTeamDisplay: available[homeIndex],
+    awayTeamDisplay: available[awayIndex]
+  };
 }
 
 function buildBetRow(sessionId, round) {
@@ -160,11 +206,12 @@ function getSpinFrame(index) {
   return SPIN_FRAMES[index % SPIN_FRAMES.length];
 }
 
-function buildRoundEmbed(round, secondsLeft, frame) {
+function buildRoundEmbed(round, secondsLeft, frame, matchup) {
   return buildEmbed({
     title: "Football Studio ⚽",
     description: [
       `Round: **${round}**`,
+      `Trận đấu: ${matchup.homeTeamDisplay} vs ${matchup.awayTeamDisplay}`,
       `Còn lại: **${secondsLeft}s** ${frame}`,
       "Đặt cược trong 30 giây.",
       "Home/Away: 1 ăn 1 (x2). Draw: x11.",
@@ -174,18 +221,19 @@ function buildRoundEmbed(round, secondsLeft, frame) {
   });
 }
 
-function buildRevealEmbed(round, frame) {
+function buildRevealEmbed(round, frame, matchup) {
   return buildEmbed({
     title: "Football Studio ⚽",
     description: [
       `Round: **${round}**`,
+      `Trận đấu: ${matchup.homeTeamDisplay} vs ${matchup.awayTeamDisplay}`,
       `Đang chia bài... ${frame}`
     ].join("\n"),
     color: 0xf6c244
   });
 }
 
-async function playRoundAnimated(message, round, guild) {
+async function playRoundAnimated(message, round, guild, matchup) {
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
   const homeCard = drawCard();
@@ -197,6 +245,7 @@ async function playRoundAnimated(message, round, guild) {
         title: "Football Studio ⚽",
         description: [
           `Round: **${round}**`,
+          `Trận đấu: ${matchup.homeTeamDisplay} vs ${matchup.awayTeamDisplay}`,
           `Home rút: **${homeDisplay}**`,
           "Away rút: **?**"
         ].join("\n"),
@@ -217,6 +266,7 @@ async function playRoundAnimated(message, round, guild) {
         title: "Football Studio ⚽",
         description: [
           `Round: **${round}**`,
+          `Trận đấu: ${matchup.homeTeamDisplay} vs ${matchup.awayTeamDisplay}`,
           `Home: **${homeDisplay}**`,
           `Away rút: **${awayDisplay}**`
         ].join("\n"),
@@ -272,7 +322,13 @@ async function runSession(channel, session) {
     const bets = [];
     const endTime = Date.now() + BET_WINDOW_MS;
     let frameIndex = 0;
-    const embed = buildRoundEmbed(round, Math.ceil(BET_WINDOW_MS / 1000), getSpinFrame(frameIndex));
+    const matchup = getRandomTeamMatchup(session.guild);
+    const embed = buildRoundEmbed(
+      round,
+      Math.ceil(BET_WINDOW_MS / 1000),
+      getSpinFrame(frameIndex),
+      matchup
+    );
 
     const message = await channel.send({
       embeds: [embed],
@@ -282,7 +338,7 @@ async function runSession(channel, session) {
     const countdownInterval = setInterval(() => {
       const secondsLeft = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
       frameIndex += 1;
-      const updated = buildRoundEmbed(round, secondsLeft, getSpinFrame(frameIndex));
+      const updated = buildRoundEmbed(round, secondsLeft, getSpinFrame(frameIndex), matchup);
       message.edit({ embeds: [updated] }).catch(() => null);
 
       if (secondsLeft <= 0) {
@@ -373,7 +429,7 @@ async function runSession(channel, session) {
     collector.on("end", async () => {
       clearInterval(countdownInterval);
       await message.edit({
-        embeds: [buildRoundEmbed(round, 0, getSpinFrame(frameIndex))],
+        embeds: [buildRoundEmbed(round, 0, getSpinFrame(frameIndex), matchup)],
         components: [buildDisabledRow(session.id, round)]
       });
     });
@@ -388,7 +444,7 @@ async function runSession(channel, session) {
     }
 
     for (let tick = 0; tick < REVEAL_TICKS; tick += 1) {
-      const revealEmbed = buildRevealEmbed(round, getSpinFrame(tick));
+      const revealEmbed = buildRevealEmbed(round, getSpinFrame(tick), matchup);
       await message.edit({ embeds: [revealEmbed], components: [buildDisabledRow(session.id, round)] });
       await new Promise((resolve) => setTimeout(resolve, REVEAL_TICK_MS));
     }
@@ -396,7 +452,8 @@ async function runSession(channel, session) {
     const { homeCard, awayCard, homeDisplay, awayDisplay } = await playRoundAnimated(
       message,
       round,
-      session.guild
+      session.guild,
+      matchup
     );
     const result = homeCard.value > awayCard.value
       ? "home"
@@ -405,10 +462,11 @@ async function runSession(channel, session) {
         : "draw";
 
     const settlement = await settleBets(bets, result);
-    const jumboBoard = buildJumboFootballBoard(homeDisplay, awayDisplay);
+    const jumboBoard = buildJumboFootballBoard(matchup.homeTeamDisplay, matchup.awayTeamDisplay);
     const resultEmbed = buildEmbed({
       title: "Kết quả Football Studio 🏁",
       description: [
+        `Trận đấu: ${matchup.homeTeamDisplay} vs ${matchup.awayTeamDisplay}`,
         `Home: **${homeDisplay}**`,
         `Away: **${awayDisplay}**`,
         `Kết quả: **${getPickLabel(result)}**`,

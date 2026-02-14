@@ -39,29 +39,30 @@ const getTokenFromRequest = (req) => {
 }
 
 const getOrCreateDbUser = async (userId, userName) => {
-  let user = await User.findOne({ userId })
-  if (!user) {
-    user = await User.create({
+  const updates = {
+    $set: {
+      lastSeen: new Date(),
+    },
+    $setOnInsert: {
       userId,
       userName: userName || '',
       balance: STARTING_BALANCE,
-      lastSeen: new Date(),
-    })
-    return user
+    },
   }
 
-  let changed = false
-  if (userName && user.userName !== userName) {
-    user.userName = userName
-    changed = true
+  if (userName) {
+    updates.$set.userName = userName
   }
-  user.lastSeen = new Date()
-  changed = true
 
-  if (changed) {
-    await user.save()
-  }
-  return user
+  return User.findOneAndUpdate(
+    { userId },
+    updates,
+    {
+      new: true,
+      upsert: true,
+      setDefaultsOnInsert: true,
+    },
+  )
 }
 
 const applyBalanceDelta = async (userId, delta) => {
@@ -839,6 +840,10 @@ app.get('/api/session', async (req, res) => {
   try {
     player = await resolvePlayerByToken(token)
   } catch (error) {
+    console.error('Failed to resolve Tien Len session', {
+      message: error?.message || String(error),
+      stack: error?.stack,
+    })
     return res.status(500).json({ error: 'Failed to load session' })
   }
   if (!player) {

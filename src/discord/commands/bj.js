@@ -31,6 +31,7 @@ const RANK_WORD_NAMES = {
 };
 const GAME_TIMEOUT_MS = 90_000;
 const DEALER_DRAW_DELAY_MS = 3_000;
+const CARD_BACK_EMOJI = "download";
 
 function buildCardEmojiCandidates(rank, suit) {
   const rankWordName = RANK_WORD_NAMES[rank];
@@ -153,7 +154,7 @@ function buildGameEmbed({
   const playerTotal = calculateHandValue(playerCards);
   const shownDealerCards = revealDealer
     ? formatHand(dealerCards)
-    : `${dealerCards[0].label} ??`;
+    : `${dealerCards[0].label} ${CARD_BACK_EMOJI}`;
   const dealerTotal = revealDealer ? calculateHandValue(dealerCards) : "?";
 
   return buildEmbed({
@@ -183,7 +184,7 @@ function buildJumboCardBoard(playerCards, dealerCards, revealDealer) {
 
   const dealerLine = revealDealer
     ? ["🟥", ...dealerCards.map((card) => card.emoji)].join(" ")
-    : ["🟥", dealerCards[0].emoji, "❓"].join(" ");
+    : ["🟥", dealerCards[0].emoji, CARD_BACK_EMOJI].join(" ");
   const playerLine = ["🟦", ...playerCards.map((card) => card.emoji)].join(" ");
   return [dealerLine, playerLine].join("\n");
 }

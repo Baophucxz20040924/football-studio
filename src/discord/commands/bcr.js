@@ -17,7 +17,7 @@ const TIE_PAYOUT_MULTIPLIER = 10;
 const SPIN_FRAMES = ["🎴🔄", "🎴✨"];
 const REVEAL_TICK_MS = 700;
 const REVEAL_TICKS = 4;
-const CARD_BACK_EMOJI = ":download:";
+const CARD_BACK_EMOJI = "download";
 
 const CARD_VALUES = new Map([
   ["A", 1],

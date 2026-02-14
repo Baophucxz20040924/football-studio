@@ -163,7 +163,7 @@ function buildRoundEmbed(round, secondsLeft, frame) {
     title: "Tài Xỉu 🎲",
     description: [
       `Phiên: **${round}**`,
-      `Còn lại: **${secondsLeft}s** ${frame}`,
+      `Còn lại: **${secondsLeft}s**`,
       "Đặt cược trong 30 giây.",
       "Tài/Xỉu/Chẵn/Lẻ: 1 ăn 1.",
       "Cược số (3-18): theo bảng tỉ lệ."
@@ -175,13 +175,12 @@ function buildRoundEmbed(round, secondsLeft, frame) {
 function buildResultEmbed(round, roll, settlement) {
   const taiXiu = roll.total >= 11 ? "Tài" : "Xỉu";
   const chanLe = roll.total % 2 === 0 ? "Chẵn" : "Lẻ";
-  const diceLabel = roll.faces ? roll.faces.join(" ") : roll.dice.join(" - ");
 
   return buildEmbed({
     title: "Kết quả Tài Xỉu 🎲",
     description: [
       `Phiên: **${round}**`,
-      `Kết quả: ${diceLabel} = **${roll.total}** (${taiXiu}, ${chanLe})`,
+      `Kết quả: **${roll.total}** (${taiXiu}, ${chanLe})`,
       `Số lượt cược: **${settlement.betCount}**`,
       `Thắng: **${settlement.winners}**`,
       `Tổng trả thưởng: **${formatPoints(settlement.totalPayout)}**`
@@ -191,18 +190,20 @@ function buildResultEmbed(round, roll, settlement) {
 }
 
 function buildRevealEmbed(round, faces, revealedCount, diceFaces) {
-  const slots = [0, 1, 2]
-    .map((index) => (index < revealedCount ? faces[index] : getRandomDiceFace(diceFaces)))
-    .join(" ");
   return buildEmbed({
     title: "Tài Xỉu 🎲",
     description: [
       `Phiên: **${round}**`,
-      "Đang mở xúc xắc...",
-      `Kết quả: ${slots}`
+      "Đang mở xúc xắc..."
     ].join("\n"),
     color: 0xf6c244
   });
+}
+
+function buildRevealSlots(faces, revealedCount, diceFaces) {
+  return [0, 1, 2]
+    .map((index) => (index < revealedCount ? faces[index] : getRandomDiceFace(diceFaces)))
+    .join(" ");
 }
 
 function getPickLabel(pick, number) {
@@ -264,12 +265,9 @@ async function runSession(channel, session) {
     const endTime = Date.now() + BET_WINDOW_MS;
     let frameIndex = 0;
 
-    const embed = buildRoundEmbed(
-      round,
-      Math.ceil(BET_WINDOW_MS / 1000),
-      getSpinFrame(frameIndex, session.diceFaces)
-    );
+    const embed = buildRoundEmbed(round, Math.ceil(BET_WINDOW_MS / 1000));
     const message = await channel.send({
+      content: getSpinFrame(frameIndex, session.diceFaces),
       embeds: [embed],
       components: [buildBetRow(session.id, round)]
     });
@@ -277,8 +275,11 @@ async function runSession(channel, session) {
     const countdownInterval = setInterval(() => {
       const secondsLeft = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
       frameIndex += 1;
-      const updated = buildRoundEmbed(round, secondsLeft, getSpinFrame(frameIndex, session.diceFaces));
-      message.edit({ embeds: [updated] }).catch(() => null);
+      const updated = buildRoundEmbed(round, secondsLeft);
+      message.edit({
+        content: getSpinFrame(frameIndex, session.diceFaces),
+        embeds: [updated]
+      }).catch(() => null);
 
       if (secondsLeft <= 0) {
         clearInterval(countdownInterval);
@@ -382,7 +383,8 @@ async function runSession(channel, session) {
     collector.on("end", async () => {
       clearInterval(countdownInterval);
       await message.edit({
-        embeds: [buildRoundEmbed(round, 0, getSpinFrame(frameIndex, session.diceFaces))],
+        content: getSpinFrame(frameIndex, session.diceFaces),
+        embeds: [buildRoundEmbed(round, 0)],
         components: [buildDisabledRow(session.id, round)]
       });
     });
@@ -399,7 +401,9 @@ async function runSession(channel, session) {
     const roll = rollDice(session.diceFaces);
     for (let i = 1; i <= 3; i += 1) {
       const revealEmbed = buildRevealEmbed(round, roll.faces, i, session.diceFaces);
+      const revealSlots = buildRevealSlots(roll.faces, i, session.diceFaces);
       await message.edit({
+        content: revealSlots,
         embeds: [revealEmbed],
         components: [buildDisabledRow(session.id, round)]
       }).catch(() => null);
@@ -409,7 +413,7 @@ async function runSession(channel, session) {
     const settlement = await settleBets(bets, roll);
     const resultEmbed = buildResultEmbed(round, roll, settlement);
 
-    await channel.send({ embeds: [resultEmbed] });
+    await channel.send({ content: roll.faces.join(" "), embeds: [resultEmbed] });
 
     if (noPlayers && session.idleRounds >= MAX_IDLE_ROUNDS) {
       session.running = false;

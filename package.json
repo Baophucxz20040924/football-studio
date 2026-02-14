@@ -5,7 +5,12 @@
   "description": "Discord football betting bot with admin web",
   "main": "src/index.js",
   "scripts": {
-    "start": "node src/index.js",
+    "start": "node src/start-all.js",
+    "start:no-build": "node src/start-all.js --skip-build",
+    "stop-all": "node src/stop-all.js",
+    "start:bot": "node src/index.js",
+    "start:tienlen-server": "npm run start --prefix src/tienlen/server",
+    "build:tienlen-client": "npm run build --prefix src/tienlen/server/client",
     "deploy-commands": "node src/deploy-commands.js"
   },
   "engines": {

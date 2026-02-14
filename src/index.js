@@ -19,6 +19,7 @@ const STARTING_BALANCE = Number(process.env.STARTING_BALANCE || 0);
 const AVIATOR_TICK_MS = 100;
 const AVIATOR_K = 0.12;
 const AVIATOR_HOUSE_EDGE = Number(process.env.AVIATOR_HOUSE_EDGE || 0.01);
+const TIENLEN_DIST_DIR = path.join(__dirname, "tienlen", "server", "client", "dist");
 
 const aviatorState = {
   status: "WAITING",
@@ -59,9 +60,21 @@ async function pruneOldMatches() {
 app.use(express.json());
 app.use("/admin", express.static(path.join(__dirname, "admin", "public")));
 app.use("/aviator/assets", express.static(path.join(__dirname, "aviator", "public")));
+app.use("/tienlen/assets", express.static(path.join(TIENLEN_DIST_DIR, "assets")));
+app.use("/assets", express.static(path.join(TIENLEN_DIST_DIR, "assets")));
 
 app.get("/aviator", (req, res) => {
   res.sendFile(path.join(__dirname, "aviator", "public", "aviator.html"));
+});
+
+app.get("/tienlen", (req, res) => {
+  return res.sendFile(path.join(TIENLEN_DIST_DIR, "index.html"), (error) => {
+    if (error) {
+      res
+        .status(500)
+        .send("Tien Len frontend is missing. Run: npm run build --prefix src/tienlen/server/client");
+    }
+  });
 });
 
 app.get("/api/health", (req, res) => {

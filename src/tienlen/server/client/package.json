@@ -1,0 +1,22 @@
+{
+  "name": "client",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "build:assets": "node scripts/build-spritesheet.mjs",
+    "predev": "npm run build:assets",
+    "prebuild": "npm run build:assets",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "phaser": "^3.90.0",
+    "socket.io-client": "^4.8.3"
+  },
+  "devDependencies": {
+    "sharp": "^0.34.4",
+    "vite": "^7.3.1"
+  }
+}

@@ -7,6 +7,7 @@ const commands = [
   require("./help"),
   require("./give"),
   require("./aviator"),
+  require("./tienlen"),
   require("./football"),
   require("./bcr"),
   require("./bj"),

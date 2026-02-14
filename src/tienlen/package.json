@@ -1,0 +1,14 @@
+{
+  "name": "tienle-multiplayer",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "start": "concurrently \"npm run dev --prefix server\" \"npm run dev --prefix server/client\"",
+    "start:server": "npm run dev --prefix server",
+    "start:client": "npm run dev --prefix server/client",
+    "install:all": "npm install --prefix server && npm install --prefix server/client"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

@@ -40,6 +40,7 @@ const SPIN_FRAMES = ["⚽️↩️", "⚽️↪️"];
 const REVEAL_TICK_MS = 700;
 const REVEAL_TICKS = 4;
 const CARD_REVEAL_DELAY_MS = 1_500;
+const FACE_DOWN_CARD = "🂠";
 const TEAM_EMOJI_NAMES = [
   "Wolverhampton_Wanderers_FC",
   "Nottingham_Forest_FC",
@@ -206,12 +207,25 @@ function getSpinFrame(index) {
   return SPIN_FRAMES[index % SPIN_FRAMES.length];
 }
 
+function buildFaceDownBoard(matchup) {
+  return [
+    `${matchup.homeTeamDisplay} ${FACE_DOWN_CARD}`,
+    `${matchup.awayTeamDisplay} ${FACE_DOWN_CARD}`
+  ].join("\n");
+}
+
+function buildCardBoard(matchup, homeCardDisplay, awayCardDisplay) {
+  return [
+    `${matchup.homeTeamDisplay} ${homeCardDisplay}`,
+    `${matchup.awayTeamDisplay} ${awayCardDisplay}`
+  ].join("\n");
+}
+
 function buildRoundEmbed(round, secondsLeft, frame, matchup) {
   return buildEmbed({
     title: "Football Studio ⚽",
     description: [
       `Round: **${round}**`,
-      `Trận đấu: ${matchup.homeTeamDisplay} vs ${matchup.awayTeamDisplay}`,
       `Còn lại: **${secondsLeft}s** ${frame}`,
       "Đặt cược trong 30 giây.",
       "Home/Away: 1 ăn 1 (x2). Draw: x11.",
@@ -226,7 +240,6 @@ function buildRevealEmbed(round, frame, matchup) {
     title: "Football Studio ⚽",
     description: [
       `Round: **${round}**`,
-      `Trận đấu: ${matchup.homeTeamDisplay} vs ${matchup.awayTeamDisplay}`,
       `Đang chia bài... ${frame}`
     ].join("\n"),
     color: 0xf6c244
@@ -240,15 +253,11 @@ async function playRoundAnimated(message, round, guild, matchup) {
   const homeDisplay = formatCardDisplay(homeCard, guild);
 
   await message.edit({
+    content: buildCardBoard(matchup, homeDisplay, FACE_DOWN_CARD),
     embeds: [
       buildEmbed({
         title: "Football Studio ⚽",
-        description: [
-          `Round: **${round}**`,
-          `Trận đấu: ${matchup.homeTeamDisplay} vs ${matchup.awayTeamDisplay}`,
-          `Home rút: **${homeDisplay}**`,
-          "Away rút: **?**"
-        ].join("\n"),
+        description: `Round: **${round}**`,
         color: 0xf6c244
       })
     ],
@@ -261,15 +270,11 @@ async function playRoundAnimated(message, round, guild, matchup) {
   const awayDisplay = formatCardDisplay(awayCard, guild);
 
   await message.edit({
+    content: buildCardBoard(matchup, homeDisplay, awayDisplay),
     embeds: [
       buildEmbed({
         title: "Football Studio ⚽",
-        description: [
-          `Round: **${round}**`,
-          `Trận đấu: ${matchup.homeTeamDisplay} vs ${matchup.awayTeamDisplay}`,
-          `Home: **${homeDisplay}**`,
-          `Away rút: **${awayDisplay}**`
-        ].join("\n"),
+        description: `Round: **${round}**`,
         color: 0xf6c244
       })
     ],
@@ -331,6 +336,7 @@ async function runSession(channel, session) {
     );
 
     const message = await channel.send({
+      content: buildFaceDownBoard(matchup),
       embeds: [embed],
       components: [buildBetRow(session.id, round)]
     });
@@ -339,7 +345,7 @@ async function runSession(channel, session) {
       const secondsLeft = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
       frameIndex += 1;
       const updated = buildRoundEmbed(round, secondsLeft, getSpinFrame(frameIndex), matchup);
-      message.edit({ embeds: [updated] }).catch(() => null);
+      message.edit({ content: buildFaceDownBoard(matchup), embeds: [updated] }).catch(() => null);
 
       if (secondsLeft <= 0) {
         clearInterval(countdownInterval);
@@ -429,6 +435,7 @@ async function runSession(channel, session) {
     collector.on("end", async () => {
       clearInterval(countdownInterval);
       await message.edit({
+        content: buildFaceDownBoard(matchup),
         embeds: [buildRoundEmbed(round, 0, getSpinFrame(frameIndex), matchup)],
         components: [buildDisabledRow(session.id, round)]
       });
@@ -445,7 +452,11 @@ async function runSession(channel, session) {
 
     for (let tick = 0; tick < REVEAL_TICKS; tick += 1) {
       const revealEmbed = buildRevealEmbed(round, getSpinFrame(tick), matchup);
-      await message.edit({ embeds: [revealEmbed], components: [buildDisabledRow(session.id, round)] });
+      await message.edit({
+        content: buildFaceDownBoard(matchup),
+        embeds: [revealEmbed],
+        components: [buildDisabledRow(session.id, round)]
+      });
       await new Promise((resolve) => setTimeout(resolve, REVEAL_TICK_MS));
     }
 

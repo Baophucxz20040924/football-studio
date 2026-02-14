@@ -40,7 +40,7 @@ const SPIN_FRAMES = ["⚽️↩️", "⚽️↪️"];
 const REVEAL_TICK_MS = 700;
 const REVEAL_TICKS = 4;
 const CARD_REVEAL_DELAY_MS = 1_500;
-const FACE_DOWN_CARD = "🂠";
+const FACE_DOWN_CARD_FALLBACK = "🎴";
 const TEAM_EMOJI_NAMES = [
   "Wolverhampton_Wanderers_FC",
   "Nottingham_Forest_FC",
@@ -160,6 +160,19 @@ function getRandomTeamMatchup(guild) {
   };
 }
 
+function resolveFaceDownCardDisplay(guild) {
+  if (!guild) {
+    return FACE_DOWN_CARD_FALLBACK;
+  }
+
+  const customBack = guild.emojis.cache.find((item) => item.name === "download");
+  if (customBack) {
+    return customBack.toString();
+  }
+
+  return FACE_DOWN_CARD_FALLBACK;
+}
+
 function buildBetRow(sessionId, round) {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
@@ -207,10 +220,10 @@ function getSpinFrame(index) {
   return SPIN_FRAMES[index % SPIN_FRAMES.length];
 }
 
-function buildFaceDownBoard(matchup) {
+function buildFaceDownBoard(matchup, faceDownCardDisplay) {
   return [
-    `${matchup.homeTeamDisplay} ${FACE_DOWN_CARD}`,
-    `${matchup.awayTeamDisplay} ${FACE_DOWN_CARD}`
+    `${matchup.homeTeamDisplay} ${faceDownCardDisplay}`,
+    `${matchup.awayTeamDisplay} ${faceDownCardDisplay}`
   ].join("\n");
 }
 
@@ -246,14 +259,14 @@ function buildRevealEmbed(round, frame, matchup) {
   });
 }
 
-async function playRoundAnimated(message, round, guild, matchup) {
+async function playRoundAnimated(message, round, guild, matchup, faceDownCardDisplay) {
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
   const homeCard = drawCard();
   const homeDisplay = formatCardDisplay(homeCard, guild);
 
   await message.edit({
-    content: buildCardBoard(matchup, homeDisplay, FACE_DOWN_CARD),
+    content: buildCardBoard(matchup, homeDisplay, faceDownCardDisplay),
     embeds: [
       buildEmbed({
         title: "Football Studio ⚽",
@@ -328,6 +341,7 @@ async function runSession(channel, session) {
     const endTime = Date.now() + BET_WINDOW_MS;
     let frameIndex = 0;
     const matchup = getRandomTeamMatchup(session.guild);
+    const faceDownCardDisplay = resolveFaceDownCardDisplay(session.guild);
     const embed = buildRoundEmbed(
       round,
       Math.ceil(BET_WINDOW_MS / 1000),
@@ -336,7 +350,7 @@ async function runSession(channel, session) {
     );
 
     const message = await channel.send({
-      content: buildFaceDownBoard(matchup),
+      content: buildFaceDownBoard(matchup, faceDownCardDisplay),
       embeds: [embed],
       components: [buildBetRow(session.id, round)]
     });
@@ -345,7 +359,10 @@ async function runSession(channel, session) {
       const secondsLeft = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
       frameIndex += 1;
       const updated = buildRoundEmbed(round, secondsLeft, getSpinFrame(frameIndex), matchup);
-      message.edit({ content: buildFaceDownBoard(matchup), embeds: [updated] }).catch(() => null);
+      message.edit({
+        content: buildFaceDownBoard(matchup, faceDownCardDisplay),
+        embeds: [updated]
+      }).catch(() => null);
 
       if (secondsLeft <= 0) {
         clearInterval(countdownInterval);
@@ -435,7 +452,7 @@ async function runSession(channel, session) {
     collector.on("end", async () => {
       clearInterval(countdownInterval);
       await message.edit({
-        content: buildFaceDownBoard(matchup),
+        content: buildFaceDownBoard(matchup, faceDownCardDisplay),
         embeds: [buildRoundEmbed(round, 0, getSpinFrame(frameIndex), matchup)],
         components: [buildDisabledRow(session.id, round)]
       });
@@ -453,7 +470,7 @@ async function runSession(channel, session) {
     for (let tick = 0; tick < REVEAL_TICKS; tick += 1) {
       const revealEmbed = buildRevealEmbed(round, getSpinFrame(tick), matchup);
       await message.edit({
-        content: buildFaceDownBoard(matchup),
+        content: buildFaceDownBoard(matchup, faceDownCardDisplay),
         embeds: [revealEmbed],
         components: [buildDisabledRow(session.id, round)]
       });
@@ -464,7 +481,8 @@ async function runSession(channel, session) {
       message,
       round,
       session.guild,
-      matchup
+      matchup,
+      faceDownCardDisplay
     );
     const result = homeCard.value > awayCard.value
       ? "home"

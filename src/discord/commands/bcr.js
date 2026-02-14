@@ -18,7 +18,7 @@ const SPIN_FRAMES = ["🎴🔄", "🎴✨"];
 const REVEAL_TICK_MS = 700;
 const REVEAL_TICKS = 4;
 const CARD_BACK_EMOJI_NAME = "download";
-const CARD_BACK_EMOJI_FALLBACK = "🂠";
+const CARD_BACK_EMOJI_FALLBACK = "🎴";
 
 const CARD_VALUES = new Map([
   ["A", 1],
@@ -216,6 +216,12 @@ function isCustomEmoji(value) {
   return /^<a?:\w+:\d+>$/.test(value);
 }
 
+function buildBaccaratBoard(playerCards, bankerCards) {
+  const playerLine = ["🟦", ...playerCards].join(" ");
+  const bankerLine = ["🟥", ...bankerCards].join(" ");
+  return [playerLine, bankerLine].join("\n");
+}
+
 function buildJumboCardBoard(playerCards, bankerCards) {
   const allCards = [...playerCards, ...bankerCards];
   if (allCards.length === 0 || allCards.some((card) => !isCustomEmoji(card.emoji))) {
@@ -275,24 +281,22 @@ async function playRoundAnimated(message, sessionId, round, guild) {
   const CARD_DELAY = 2000;
   const cardBackEmoji = resolveCardBackEmoji(guild);
 
-  const faceDownLabel = (count) => Array.from({ length: count }, () => cardBackEmoji).join(" ");
+  const faceDownCards = (count) => Array.from({ length: count }, () => cardBackEmoji);
   const formatMixedCards = (cards, revealedCount) => cards
-    .map((card, index) => (index < revealedCount ? card.display : cardBackEmoji))
-    .join(" ");
+    .map((card, index) => (index < revealedCount ? card.display : cardBackEmoji));
 
   const playerCards = [drawCard(guild), drawCard(guild)];
   const bankerCards = [drawCard(guild), drawCard(guild)];
 
   let embed = buildEmbed({
     title: "Baccarat 🎴",
-    description: [
-      `Round: **${round}**`,
-      `Player: ${faceDownLabel(2)}`,
-      `Banker: ${faceDownLabel(2)}`
-    ].join("\n"),
+    description: `Round: **${round}**`,
     color: 0xf6c244
   });
-  await message.edit({ embeds: [embed] }).catch(() => null);
+  await message.edit({
+    content: buildBaccaratBoard(faceDownCards(2), faceDownCards(2)),
+    embeds: [embed]
+  }).catch(() => null);
   await delay(CARD_DELAY);
 
   let playerRevealed = 0;
@@ -307,14 +311,16 @@ async function playRoundAnimated(message, sessionId, round, guild) {
 
     embed = buildEmbed({
       title: "Baccarat 🎴",
-      description: [
-        `Round: **${round}**`,
-        `Player: ${formatMixedCards(playerCards, playerRevealed)}`,
-        `Banker: ${formatMixedCards(bankerCards, bankerRevealed)}`
-      ].join("\n"),
+      description: `Round: **${round}**`,
       color: 0xf6c244
     });
-    await message.edit({ embeds: [embed] }).catch(() => null);
+    await message.edit({
+      content: buildBaccaratBoard(
+        formatMixedCards(playerCards, playerRevealed),
+        formatMixedCards(bankerCards, bankerRevealed)
+      ),
+      embeds: [embed]
+    }).catch(() => null);
     await delay(CARD_DELAY);
   }
 
@@ -327,12 +333,18 @@ async function playRoundAnimated(message, sessionId, round, guild) {
     title: "Baccarat 🎴",
     description: [
       `Round: **${round}**`,
-      `Player: ${playerLabel} (=${playerTotal})`,
-      `Banker: ${bankerLabel} (=${bankerTotal})`
+      `Player: (=${playerTotal})`,
+      `Banker: (=${bankerTotal})`
     ].join("\n"),
     color: 0xf6c244
   });
-  await message.edit({ embeds: [embed] }).catch(() => null);
+  await message.edit({
+    content: buildBaccaratBoard(
+      playerCards.map((c) => c.display),
+      bankerCards.map((c) => c.display)
+    ),
+    embeds: [embed]
+  }).catch(() => null);
   await delay(CARD_DELAY);
 
   const natural = playerTotal >= 8 || bankerTotal >= 8;
@@ -347,12 +359,18 @@ async function playRoundAnimated(message, sessionId, round, guild) {
       title: "Baccarat 🎴",
       description: [
         `Round: **${round}**`,
-        `Player rút lá 3 (úp): ${faceDownLabel(playerCards.length)}`,
-        `Banker: ${bankerLabel} (=${bankerTotal})`
+        "Player rút lá 3 (úp)",
+        `Banker: (=${bankerTotal})`
       ].join("\n"),
       color: 0xf6c244
     });
-    await message.edit({ embeds: [embed] }).catch(() => null);
+    await message.edit({
+      content: buildBaccaratBoard(
+        faceDownCards(playerCards.length),
+        bankerCards.map((c) => c.display)
+      ),
+      embeds: [embed]
+    }).catch(() => null);
     await delay(CARD_DELAY);
 
     playerTotal = totalPoints(playerCards);
@@ -361,12 +379,18 @@ async function playRoundAnimated(message, sessionId, round, guild) {
       title: "Baccarat 🎴",
       description: [
         `Round: **${round}**`,
-        `Player rút lá 3: ${playerLabel} (=${playerTotal})`,
-        `Banker: ${bankerLabel} (=${bankerTotal})`
+        `Player rút lá 3: (=${playerTotal})`,
+        `Banker: (=${bankerTotal})`
       ].join("\n"),
       color: 0xf6c244
     });
-    await message.edit({ embeds: [embed] }).catch(() => null);
+    await message.edit({
+      content: buildBaccaratBoard(
+        playerCards.map((c) => c.display),
+        bankerCards.map((c) => c.display)
+      ),
+      embeds: [embed]
+    }).catch(() => null);
     await delay(CARD_DELAY);
   }
 
@@ -378,12 +402,18 @@ async function playRoundAnimated(message, sessionId, round, guild) {
       title: "Baccarat 🎴",
       description: [
         `Round: **${round}**`,
-        `Player: ${playerLabel} (=${playerTotal})`,
-        `Banker rút lá 3 (úp): ${faceDownLabel(bankerCards.length)}`
+        `Player: (=${playerTotal})`,
+        "Banker rút lá 3 (úp)"
       ].join("\n"),
       color: 0xf6c244
     });
-    await message.edit({ embeds: [embed] }).catch(() => null);
+    await message.edit({
+      content: buildBaccaratBoard(
+        playerCards.map((c) => c.display),
+        faceDownCards(bankerCards.length)
+      ),
+      embeds: [embed]
+    }).catch(() => null);
     await delay(CARD_DELAY);
 
     bankerTotal = totalPoints(bankerCards);
@@ -392,12 +422,18 @@ async function playRoundAnimated(message, sessionId, round, guild) {
       title: "Baccarat 🎴",
       description: [
         `Round: **${round}**`,
-        `Player: ${playerLabel} (=${playerTotal})`,
-        `Banker rút lá 3: ${bankerLabel} (=${bankerTotal})`
+        `Player: (=${playerTotal})`,
+        `Banker rút lá 3: (=${bankerTotal})`
       ].join("\n"),
       color: 0xf6c244
     });
-    await message.edit({ embeds: [embed] }).catch(() => null);
+    await message.edit({
+      content: buildBaccaratBoard(
+        playerCards.map((c) => c.display),
+        bankerCards.map((c) => c.display)
+      ),
+      embeds: [embed]
+    }).catch(() => null);
     await delay(CARD_DELAY);
   }
 
@@ -419,6 +455,10 @@ async function runSession(channel, session) {
     const embed = buildRoundEmbed(round, Math.ceil(BET_WINDOW_MS / 1000), getSpinFrame(frameIndex));
 
     const message = await channel.send({
+      content: buildBaccaratBoard(
+        [resolveCardBackEmoji(session.guild), resolveCardBackEmoji(session.guild)],
+        [resolveCardBackEmoji(session.guild), resolveCardBackEmoji(session.guild)]
+      ),
       embeds: [embed],
       components: [buildBetRow(session.id, round)]
     });
@@ -427,7 +467,11 @@ async function runSession(channel, session) {
       const secondsLeft = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
       frameIndex += 1;
       const updated = buildRoundEmbed(round, secondsLeft, getSpinFrame(frameIndex));
-      message.edit({ embeds: [updated] }).catch(() => null);
+      const cardBackEmoji = resolveCardBackEmoji(session.guild);
+      message.edit({
+        content: buildBaccaratBoard([cardBackEmoji, cardBackEmoji], [cardBackEmoji, cardBackEmoji]),
+        embeds: [updated]
+      }).catch(() => null);
 
       if (secondsLeft <= 0) {
         clearInterval(countdownInterval);
@@ -517,6 +561,10 @@ async function runSession(channel, session) {
     collector.on("end", async () => {
       clearInterval(countdownInterval);
       await message.edit({
+        content: buildBaccaratBoard(
+          [resolveCardBackEmoji(session.guild), resolveCardBackEmoji(session.guild)],
+          [resolveCardBackEmoji(session.guild), resolveCardBackEmoji(session.guild)]
+        ),
         embeds: [buildRoundEmbed(round, 0, getSpinFrame(frameIndex))],
         components: [buildDisabledRow(session.id, round)]
       });
@@ -533,7 +581,12 @@ async function runSession(channel, session) {
 
     for (let tick = 0; tick < REVEAL_TICKS; tick += 1) {
       const revealEmbed = buildRevealEmbed(round, getSpinFrame(tick));
-      await message.edit({ embeds: [revealEmbed], components: [buildDisabledRow(session.id, round)] });
+      const cardBackEmoji = resolveCardBackEmoji(session.guild);
+      await message.edit({
+        content: buildBaccaratBoard([cardBackEmoji, cardBackEmoji], [cardBackEmoji, cardBackEmoji]),
+        embeds: [revealEmbed],
+        components: [buildDisabledRow(session.id, round)]
+      });
       await new Promise((resolve) => setTimeout(resolve, REVEAL_TICK_MS));
     }
 

@@ -13,6 +13,7 @@ const BET_WINDOW_MS = 30_000;
 const MAX_IDLE_ROUNDS = 4;
 const DICE_FACES = ["⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
 const DICE_REVEAL_DELAY_MS = 3000;
+const DICE_EMOJI_PREFIX = "dice_";
 
 const NUMBER_ODDS = new Map([
   [3, 100],
@@ -36,20 +37,37 @@ const NUMBER_ODDS = new Map([
 const sessions = new Map();
 let sessionCounter = 0;
 
-function rollDice() {
+function getDiceFace(guild, value) {
+  const fallback = DICE_FACES[value - 1] || "🎲";
+  if (!guild) {
+    return fallback;
+  }
+
+  const emojiName = `${DICE_EMOJI_PREFIX}${value}`;
+  const emoji = guild.emojis.cache.find((item) => item.name === emojiName);
+  return emoji ? emoji.toString() : fallback;
+}
+
+function rollDice(guild) {
   const dice = [
     1 + Math.floor(Math.random() * 6),
     1 + Math.floor(Math.random() * 6),
     1 + Math.floor(Math.random() * 6)
   ];
   const total = dice.reduce((sum, value) => sum + value, 0);
-  const faces = dice.map((value) => DICE_FACES[value - 1]);
+  const faces = dice.map((value) => getDiceFace(guild, value));
   return { dice, total, faces };
 }
 
-function getSpinFrame(index) {
-  const face = DICE_FACES[index % DICE_FACES.length];
+function getSpinFrame(index, guild) {
+  const value = (index % 6) + 1;
+  const face = getDiceFace(guild, value);
   return `${face} ${face} ${face}`;
+}
+
+function getRandomDiceFace(guild) {
+  const value = 1 + Math.floor(Math.random() * 6);
+  return getDiceFace(guild, value);
 }
 
 function buildBetRow(sessionId, round) {
@@ -139,8 +157,10 @@ function buildResultEmbed(round, roll, settlement) {
   });
 }
 
-function buildRevealEmbed(round, faces, revealedCount) {
-  const slots = [0, 1, 2].map((index) => (index < revealedCount ? faces[index] : "❔")).join(" ");
+function buildRevealEmbed(round, faces, revealedCount, guild) {
+  const slots = [0, 1, 2]
+    .map((index) => (index < revealedCount ? faces[index] : getRandomDiceFace(guild)))
+    .join(" ");
   return buildEmbed({
     title: "Tài Xỉu 🎲",
     description: [
@@ -211,7 +231,11 @@ async function runSession(channel, session) {
     const endTime = Date.now() + BET_WINDOW_MS;
     let frameIndex = 0;
 
-    const embed = buildRoundEmbed(round, Math.ceil(BET_WINDOW_MS / 1000), getSpinFrame(frameIndex));
+    const embed = buildRoundEmbed(
+      round,
+      Math.ceil(BET_WINDOW_MS / 1000),
+      getSpinFrame(frameIndex, session.guild)
+    );
     const message = await channel.send({
       embeds: [embed],
       components: [buildBetRow(session.id, round)]
@@ -220,7 +244,7 @@ async function runSession(channel, session) {
     const countdownInterval = setInterval(() => {
       const secondsLeft = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
       frameIndex += 1;
-      const updated = buildRoundEmbed(round, secondsLeft, getSpinFrame(frameIndex));
+      const updated = buildRoundEmbed(round, secondsLeft, getSpinFrame(frameIndex, session.guild));
       message.edit({ embeds: [updated] }).catch(() => null);
 
       if (secondsLeft <= 0) {
@@ -325,7 +349,7 @@ async function runSession(channel, session) {
     collector.on("end", async () => {
       clearInterval(countdownInterval);
       await message.edit({
-        embeds: [buildRoundEmbed(round, 0, getSpinFrame(frameIndex))],
+        embeds: [buildRoundEmbed(round, 0, getSpinFrame(frameIndex, session.guild))],
         components: [buildDisabledRow(session.id, round)]
       });
     });
@@ -339,9 +363,9 @@ async function runSession(channel, session) {
       session.idleRounds = 0;
     }
 
-    const roll = rollDice();
+    const roll = rollDice(session.guild);
     for (let i = 1; i <= 3; i += 1) {
-      const revealEmbed = buildRevealEmbed(round, roll.faces, i);
+      const revealEmbed = buildRevealEmbed(round, roll.faces, i, session.guild);
       await message.edit({
         embeds: [revealEmbed],
         components: [buildDisabledRow(session.id, round)]
@@ -366,6 +390,10 @@ module.exports = {
     .setName("tx")
     .setDescription("Tai xiu - dat cuoc tai/xiu/chan/le/so"),
   async execute(interaction) {
+    if (interaction.guild) {
+      await interaction.guild.emojis.fetch().catch(() => null);
+    }
+
     if (!interaction.channel) {
       return interaction.reply({ content: "Lệnh này chỉ dùng trong server.", ephemeral: true });
     }
@@ -381,6 +409,7 @@ module.exports = {
     const session = {
       id: String(++sessionCounter),
       channelId,
+      guild: interaction.guild,
       round: 0,
       idleRounds: 0,
       running: true

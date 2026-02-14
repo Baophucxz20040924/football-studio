@@ -17,6 +17,7 @@ const TIE_PAYOUT_MULTIPLIER = 10;
 const SPIN_FRAMES = ["🎴🔄", "🎴✨"];
 const REVEAL_TICK_MS = 700;
 const REVEAL_TICKS = 4;
+const CARD_BACK_EMOJI = ":download:";
 
 const CARD_VALUES = new Map([
   ["A", 1],
@@ -263,46 +264,54 @@ async function playRoundAnimated(message, sessionId, round, guild) {
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const CARD_DELAY = 2000;
 
-  // Player draws 2 cards
-  const playerCards = [drawCard(guild)];
-  let playerLabel = playerCards.map((c) => c.display).join(" ");
+  const faceDownLabel = (count) => Array.from({ length: count }, () => CARD_BACK_EMOJI).join(" ");
+  const formatMixedCards = (cards, revealedCount) => cards
+    .map((card, index) => (index < revealedCount ? card.display : CARD_BACK_EMOJI))
+    .join(" ");
+
+  const playerCards = [drawCard(guild), drawCard(guild)];
+  const bankerCards = [drawCard(guild), drawCard(guild)];
+
   let embed = buildEmbed({
-    title: "Baccarat 🎴",
-    description: `Round: **${round}**\nPlayer rút: ${playerLabel}...`,
-    color: 0xf6c244
-  });
-  await message.edit({ embeds: [embed] }).catch(() => null);
-  await delay(CARD_DELAY);
-
-  playerCards.push(drawCard(guild));
-  playerLabel = playerCards.map((c) => c.display).join(" ");
-  let playerTotal = totalPoints(playerCards);
-  embed = buildEmbed({
-    title: "Baccarat 🎴",
-    description: `Round: **${round}**\nPlayer: ${playerLabel} (=${playerTotal})`,
-    color: 0xf6c244
-  });
-  await message.edit({ embeds: [embed] }).catch(() => null);
-  await delay(CARD_DELAY);
-
-  // Banker draws 2 cards
-  const bankerCards = [drawCard(guild)];
-  let bankerLabel = bankerCards.map((c) => c.display).join(" ");
-  embed = buildEmbed({
     title: "Baccarat 🎴",
     description: [
       `Round: **${round}**`,
-      `Player: ${playerLabel} (=${playerTotal})`,
-      `Banker rút: ${bankerLabel}...`
+      `Player: ${faceDownLabel(2)}`,
+      `Banker: ${faceDownLabel(2)}`
     ].join("\n"),
     color: 0xf6c244
   });
   await message.edit({ embeds: [embed] }).catch(() => null);
   await delay(CARD_DELAY);
 
-  bankerCards.push(drawCard(guild));
-  bankerLabel = bankerCards.map((c) => c.display).join(" ");
+  let playerRevealed = 0;
+  let bankerRevealed = 0;
+  const revealOrder = ["player", "banker", "player", "banker"];
+  for (const target of revealOrder) {
+    if (target === "player") {
+      playerRevealed += 1;
+    } else {
+      bankerRevealed += 1;
+    }
+
+    embed = buildEmbed({
+      title: "Baccarat 🎴",
+      description: [
+        `Round: **${round}**`,
+        `Player: ${formatMixedCards(playerCards, playerRevealed)}`,
+        `Banker: ${formatMixedCards(bankerCards, bankerRevealed)}`
+      ].join("\n"),
+      color: 0xf6c244
+    });
+    await message.edit({ embeds: [embed] }).catch(() => null);
+    await delay(CARD_DELAY);
+  }
+
+  let playerTotal = totalPoints(playerCards);
   let bankerTotal = totalPoints(bankerCards);
+  let playerLabel = playerCards.map((c) => c.display).join(" ");
+  let bankerLabel = bankerCards.map((c) => c.display).join(" ");
+
   embed = buildEmbed({
     title: "Baccarat 🎴",
     description: [
@@ -322,6 +331,19 @@ async function playRoundAnimated(message, sessionId, round, guild) {
   if (!natural && shouldPlayerDraw(playerTotal)) {
     playerThird = drawCard(guild);
     playerCards.push(playerThird);
+
+    embed = buildEmbed({
+      title: "Baccarat 🎴",
+      description: [
+        `Round: **${round}**`,
+        `Player rút lá 3 (úp): ${faceDownLabel(playerCards.length)}`,
+        `Banker: ${bankerLabel} (=${bankerTotal})`
+      ].join("\n"),
+      color: 0xf6c244
+    });
+    await message.edit({ embeds: [embed] }).catch(() => null);
+    await delay(CARD_DELAY);
+
     playerTotal = totalPoints(playerCards);
     playerLabel = playerCards.map((c) => c.display).join(" ");
     embed = buildEmbed({
@@ -340,6 +362,19 @@ async function playRoundAnimated(message, sessionId, round, guild) {
   // Check banker draw
   if (!natural && shouldBankerDraw(bankerTotal, playerThird?.value, Boolean(playerThird))) {
     bankerCards.push(drawCard(guild));
+
+    embed = buildEmbed({
+      title: "Baccarat 🎴",
+      description: [
+        `Round: **${round}**`,
+        `Player: ${playerLabel} (=${playerTotal})`,
+        `Banker rút lá 3 (úp): ${faceDownLabel(bankerCards.length)}`
+      ].join("\n"),
+      color: 0xf6c244
+    });
+    await message.edit({ embeds: [embed] }).catch(() => null);
+    await delay(CARD_DELAY);
+
     bankerTotal = totalPoints(bankerCards);
     bankerLabel = bankerCards.map((c) => c.display).join(" ");
     embed = buildEmbed({

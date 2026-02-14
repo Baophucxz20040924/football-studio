@@ -37,37 +37,70 @@ const NUMBER_ODDS = new Map([
 const sessions = new Map();
 let sessionCounter = 0;
 
-function getDiceFace(guild, value) {
-  const fallback = DICE_FACES[value - 1] || "🎲";
+function normalizeDiceEmojiName(name) {
+  return String(name || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+async function resolveDiceFaces(guild) {
+  const resolved = DICE_FACES.slice();
   if (!guild) {
+    return resolved;
+  }
+
+  const collection = await guild.emojis.fetch().catch(() => guild.emojis.cache);
+  const valueToEmoji = new Map();
+
+  for (const emoji of collection.values()) {
+    const normalized = normalizeDiceEmojiName(emoji.name);
+    const match = normalized.match(/^dice([1-6])$/i);
+    if (!match) {
+      continue;
+    }
+
+    const value = Number(match[1]);
+    if (!valueToEmoji.has(value)) {
+      valueToEmoji.set(value, emoji.toString());
+    }
+  }
+
+  for (let value = 1; value <= 6; value += 1) {
+    if (valueToEmoji.has(value)) {
+      resolved[value - 1] = valueToEmoji.get(value);
+    }
+  }
+
+  return resolved;
+}
+
+function getDiceFace(diceFaces, value) {
+  const fallback = DICE_FACES[value - 1] || "🎲";
+  if (!Array.isArray(diceFaces) || diceFaces.length < value) {
     return fallback;
   }
 
-  const emojiName = `${DICE_EMOJI_PREFIX}${value}`;
-  const emoji = guild.emojis.cache.find((item) => item.name === emojiName);
-  return emoji ? emoji.toString() : fallback;
+  return diceFaces[value - 1] || fallback;
 }
 
-function rollDice(guild) {
+function rollDice(diceFaces) {
   const dice = [
     1 + Math.floor(Math.random() * 6),
     1 + Math.floor(Math.random() * 6),
     1 + Math.floor(Math.random() * 6)
   ];
   const total = dice.reduce((sum, value) => sum + value, 0);
-  const faces = dice.map((value) => getDiceFace(guild, value));
+  const faces = dice.map((value) => getDiceFace(diceFaces, value));
   return { dice, total, faces };
 }
 
-function getSpinFrame(index, guild) {
+function getSpinFrame(index, diceFaces) {
   const value = (index % 6) + 1;
-  const face = getDiceFace(guild, value);
+  const face = getDiceFace(diceFaces, value);
   return `${face} ${face} ${face}`;
 }
 
-function getRandomDiceFace(guild) {
+function getRandomDiceFace(diceFaces) {
   const value = 1 + Math.floor(Math.random() * 6);
-  return getDiceFace(guild, value);
+  return getDiceFace(diceFaces, value);
 }
 
 function buildBetRow(sessionId, round) {
@@ -157,9 +190,9 @@ function buildResultEmbed(round, roll, settlement) {
   });
 }
 
-function buildRevealEmbed(round, faces, revealedCount, guild) {
+function buildRevealEmbed(round, faces, revealedCount, diceFaces) {
   const slots = [0, 1, 2]
-    .map((index) => (index < revealedCount ? faces[index] : getRandomDiceFace(guild)))
+    .map((index) => (index < revealedCount ? faces[index] : getRandomDiceFace(diceFaces)))
     .join(" ");
   return buildEmbed({
     title: "Tài Xỉu 🎲",
@@ -234,7 +267,7 @@ async function runSession(channel, session) {
     const embed = buildRoundEmbed(
       round,
       Math.ceil(BET_WINDOW_MS / 1000),
-      getSpinFrame(frameIndex, session.guild)
+      getSpinFrame(frameIndex, session.diceFaces)
     );
     const message = await channel.send({
       embeds: [embed],
@@ -244,7 +277,7 @@ async function runSession(channel, session) {
     const countdownInterval = setInterval(() => {
       const secondsLeft = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
       frameIndex += 1;
-      const updated = buildRoundEmbed(round, secondsLeft, getSpinFrame(frameIndex, session.guild));
+      const updated = buildRoundEmbed(round, secondsLeft, getSpinFrame(frameIndex, session.diceFaces));
       message.edit({ embeds: [updated] }).catch(() => null);
 
       if (secondsLeft <= 0) {
@@ -349,7 +382,7 @@ async function runSession(channel, session) {
     collector.on("end", async () => {
       clearInterval(countdownInterval);
       await message.edit({
-        embeds: [buildRoundEmbed(round, 0, getSpinFrame(frameIndex, session.guild))],
+        embeds: [buildRoundEmbed(round, 0, getSpinFrame(frameIndex, session.diceFaces))],
         components: [buildDisabledRow(session.id, round)]
       });
     });
@@ -363,9 +396,9 @@ async function runSession(channel, session) {
       session.idleRounds = 0;
     }
 
-    const roll = rollDice(session.guild);
+    const roll = rollDice(session.diceFaces);
     for (let i = 1; i <= 3; i += 1) {
-      const revealEmbed = buildRevealEmbed(round, roll.faces, i, session.guild);
+      const revealEmbed = buildRevealEmbed(round, roll.faces, i, session.diceFaces);
       await message.edit({
         embeds: [revealEmbed],
         components: [buildDisabledRow(session.id, round)]
@@ -390,9 +423,7 @@ module.exports = {
     .setName("tx")
     .setDescription("Tai xiu - dat cuoc tai/xiu/chan/le/so"),
   async execute(interaction) {
-    if (interaction.guild) {
-      await interaction.guild.emojis.fetch().catch(() => null);
-    }
+    const diceFaces = await resolveDiceFaces(interaction.guild);
 
     if (!interaction.channel) {
       return interaction.reply({ content: "Lệnh này chỉ dùng trong server.", ephemeral: true });
@@ -410,6 +441,7 @@ module.exports = {
       id: String(++sessionCounter),
       channelId,
       guild: interaction.guild,
+      diceFaces,
       round: 0,
       idleRounds: 0,
       running: true

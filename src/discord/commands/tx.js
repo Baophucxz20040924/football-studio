@@ -13,6 +13,7 @@ const BET_WINDOW_MS = 30_000;
 const MAX_IDLE_ROUNDS = 4;
 const DICE_FACES = ["⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
 const DICE_REVEAL_DELAY_MS = 3000;
+const DICE_REVEAL_TICK_MS = 350;
 const DICE_EMOJI_PREFIX = "dice_";
 
 const NUMBER_ODDS = new Map([
@@ -204,6 +205,23 @@ function buildRevealSlots(faces, revealedCount, diceFaces) {
   return [0, 1, 2]
     .map((index) => (index < revealedCount ? faces[index] : getRandomDiceFace(diceFaces)))
     .join(" ");
+}
+
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function playRevealStep(message, round, rollFaces, revealedCount, session) {
+  const revealEmbed = buildRevealEmbed(round, rollFaces, revealedCount, session.diceFaces);
+  const steps = Math.max(1, Math.floor(DICE_REVEAL_DELAY_MS / DICE_REVEAL_TICK_MS));
+
+  for (let step = 0; step < steps; step += 1) {
+    const revealSlots = buildRevealSlots(rollFaces, revealedCount, session.diceFaces);
+    await message.edit({
+      content: revealSlots,
+      embeds: [revealEmbed],
+      components: [buildDisabledRow(session.id, round)]
+    }).catch(() => null);
+    await wait(DICE_REVEAL_TICK_MS);
+  }
 }
 
 function getPickLabel(pick, number) {
@@ -400,14 +418,7 @@ async function runSession(channel, session) {
 
     const roll = rollDice(session.diceFaces);
     for (let i = 1; i <= 3; i += 1) {
-      const revealEmbed = buildRevealEmbed(round, roll.faces, i, session.diceFaces);
-      const revealSlots = buildRevealSlots(roll.faces, i, session.diceFaces);
-      await message.edit({
-        content: revealSlots,
-        embeds: [revealEmbed],
-        components: [buildDisabledRow(session.id, round)]
-      }).catch(() => null);
-      await new Promise((resolve) => setTimeout(resolve, DICE_REVEAL_DELAY_MS));
+      await playRevealStep(message, round, roll.faces, i, session);
     }
 
     const settlement = await settleBets(bets, roll);

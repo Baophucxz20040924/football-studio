@@ -19,6 +19,7 @@ const REVEAL_TICK_MS = 700;
 const REVEAL_TICKS = 4;
 const CARD_BACK_EMOJI_NAME = "download";
 const CARD_BACK_EMOJI_FALLBACK = "🎴";
+const THIRD_CARD_REVEAL_DELAY_MS = 1_500;
 
 const CARD_VALUES = new Map([
   ["A", 1],
@@ -284,6 +285,8 @@ async function playRoundAnimated(message, sessionId, round, guild) {
   const faceDownCards = (count) => Array.from({ length: count }, () => cardBackEmoji);
   const formatMixedCards = (cards, revealedCount) => cards
     .map((card, index) => (index < revealedCount ? card.display : cardBackEmoji));
+  const formatThirdCardFaceDown = (cards) => cards
+    .map((card, index) => (index === cards.length - 1 ? cardBackEmoji : card.display));
 
   const playerCards = [drawCard(guild), drawCard(guild)];
   const bankerCards = [drawCard(guild), drawCard(guild)];
@@ -366,12 +369,12 @@ async function playRoundAnimated(message, sessionId, round, guild) {
     });
     await message.edit({
       content: buildBaccaratBoard(
-        faceDownCards(playerCards.length),
+        formatThirdCardFaceDown(playerCards),
         bankerCards.map((c) => c.display)
       ),
       embeds: [embed]
     }).catch(() => null);
-    await delay(CARD_DELAY);
+    await delay(THIRD_CARD_REVEAL_DELAY_MS);
 
     playerTotal = totalPoints(playerCards);
     playerLabel = playerCards.map((c) => c.display).join(" ");
@@ -410,11 +413,11 @@ async function playRoundAnimated(message, sessionId, round, guild) {
     await message.edit({
       content: buildBaccaratBoard(
         playerCards.map((c) => c.display),
-        faceDownCards(bankerCards.length)
+        formatThirdCardFaceDown(bankerCards)
       ),
       embeds: [embed]
     }).catch(() => null);
-    await delay(CARD_DELAY);
+    await delay(THIRD_CARD_REVEAL_DELAY_MS);
 
     bankerTotal = totalPoints(bankerCards);
     bankerLabel = bankerCards.map((c) => c.display).join(" ");

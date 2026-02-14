@@ -17,7 +17,8 @@ const TIE_PAYOUT_MULTIPLIER = 10;
 const SPIN_FRAMES = ["🎴🔄", "🎴✨"];
 const REVEAL_TICK_MS = 700;
 const REVEAL_TICKS = 4;
-const CARD_BACK_EMOJI = "download";
+const CARD_BACK_EMOJI_NAME = "download";
+const CARD_BACK_EMOJI_FALLBACK = "🂠";
 
 const CARD_VALUES = new Map([
   ["A", 1],
@@ -95,6 +96,15 @@ function resolveCustomCardEmoji(guild, rank, suit) {
   }
 
   return null;
+}
+
+function resolveCardBackEmoji(guild) {
+  if (!guild) {
+    return CARD_BACK_EMOJI_FALLBACK;
+  }
+
+  const emoji = guild.emojis.cache.find((item) => item.name === CARD_BACK_EMOJI_NAME);
+  return emoji ? emoji.toString() : CARD_BACK_EMOJI_FALLBACK;
 }
 
 function drawCard(guild) {
@@ -263,10 +273,11 @@ async function settleBets(bets, result) {
 async function playRoundAnimated(message, sessionId, round, guild) {
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const CARD_DELAY = 2000;
+  const cardBackEmoji = resolveCardBackEmoji(guild);
 
-  const faceDownLabel = (count) => Array.from({ length: count }, () => CARD_BACK_EMOJI).join(" ");
+  const faceDownLabel = (count) => Array.from({ length: count }, () => cardBackEmoji).join(" ");
   const formatMixedCards = (cards, revealedCount) => cards
-    .map((card, index) => (index < revealedCount ? card.display : CARD_BACK_EMOJI))
+    .map((card, index) => (index < revealedCount ? card.display : cardBackEmoji))
     .join(" ");
 
   const playerCards = [drawCard(guild), drawCard(guild)];

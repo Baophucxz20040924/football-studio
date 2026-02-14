@@ -31,7 +31,8 @@ const RANK_WORD_NAMES = {
 };
 const GAME_TIMEOUT_MS = 90_000;
 const DEALER_DRAW_DELAY_MS = 3_000;
-const CARD_BACK_EMOJI = "download";
+const CARD_BACK_EMOJI_NAME = "download";
+const CARD_BACK_EMOJI_FALLBACK = "🂠";
 
 function buildCardEmojiCandidates(rank, suit) {
   const rankWordName = RANK_WORD_NAMES[rank];
@@ -67,6 +68,15 @@ function resolveCustomCardEmoji(guild, rank, suit) {
   }
 
   return null;
+}
+
+function resolveCardBackEmoji(guild) {
+  if (!guild) {
+    return CARD_BACK_EMOJI_FALLBACK;
+  }
+
+  const emoji = guild.emojis.cache.find((item) => item.name === CARD_BACK_EMOJI_NAME);
+  return emoji ? emoji.toString() : CARD_BACK_EMOJI_FALLBACK;
 }
 
 function sleep(ms) {
@@ -149,12 +159,13 @@ function buildGameEmbed({
   playerCards,
   dealerCards,
   revealDealer,
-  status
+  status,
+  cardBackEmoji
 }) {
   const playerTotal = calculateHandValue(playerCards);
   const shownDealerCards = revealDealer
     ? formatHand(dealerCards)
-    : `${dealerCards[0].label} ${CARD_BACK_EMOJI}`;
+    : `${dealerCards[0].label} ${cardBackEmoji}`;
   const dealerTotal = revealDealer ? calculateHandValue(dealerCards) : "?";
 
   return buildEmbed({
@@ -175,7 +186,7 @@ function isCustomEmoji(value) {
   return /^<a?:\w+:\d+>$/.test(value);
 }
 
-function buildJumboCardBoard(playerCards, dealerCards, revealDealer) {
+function buildJumboCardBoard(playerCards, dealerCards, revealDealer, cardBackEmoji) {
   const visibleDealerCards = revealDealer ? dealerCards : dealerCards.slice(0, 1);
   const visibleCards = [...playerCards, ...visibleDealerCards];
   if (visibleCards.length === 0 || visibleCards.some((card) => !isCustomEmoji(card.emoji))) {
@@ -184,7 +195,7 @@ function buildJumboCardBoard(playerCards, dealerCards, revealDealer) {
 
   const dealerLine = revealDealer
     ? ["🟥", ...dealerCards.map((card) => card.emoji)].join(" ")
-    : ["🟥", dealerCards[0].emoji, CARD_BACK_EMOJI].join(" ");
+    : ["🟥", dealerCards[0].emoji, cardBackEmoji].join(" ");
   const playerLine = ["🟦", ...playerCards.map((card) => card.emoji)].join(" ");
   return [dealerLine, playerLine].join("\n");
 }
@@ -197,7 +208,8 @@ function buildGameMessagePayload({
   revealDealer,
   status,
   components,
-  fetchReply
+  fetchReply,
+  cardBackEmoji = CARD_BACK_EMOJI_FALLBACK
 }) {
   const payload = {
     embeds: [
@@ -207,12 +219,13 @@ function buildGameMessagePayload({
         playerCards,
         dealerCards,
         revealDealer,
-        status
+        status,
+        cardBackEmoji
       })
     ]
   };
 
-  const jumboCardBoard = buildJumboCardBoard(playerCards, dealerCards, revealDealer);
+  const jumboCardBoard = buildJumboCardBoard(playerCards, dealerCards, revealDealer, cardBackEmoji);
   if (jumboCardBoard) {
     payload.content = jumboCardBoard;
   }
@@ -283,6 +296,8 @@ module.exports = {
           await interaction.guild.emojis.fetch().catch(() => null);
         }
 
+    const cardBackEmoji = resolveCardBackEmoji(interaction.guild);
+
     if (!interaction.channel) {
       return interaction.reply({ content: "Lệnh này chỉ dùng trong server.", ephemeral: true });
     }
@@ -325,7 +340,8 @@ module.exports = {
         playerCards,
         dealerCards,
         revealDealer: true,
-        status: settlement.message
+        status: settlement.message,
+        cardBackEmoji
       }));
     }
 
@@ -337,7 +353,8 @@ module.exports = {
       revealDealer: false,
       status: "Bấm **Hit** để rút thêm, hoặc **Stand** để dừng.",
       components: [buildControls(gameId)],
-      fetchReply: true
+      fetchReply: true,
+      cardBackEmoji
     }));
 
     let finished = false;
@@ -359,7 +376,8 @@ module.exports = {
           dealerCards,
           revealDealer: true,
           status: `${statusMessage}\nDealer lật bài...`,
-          components: [buildDisabledControls(gameId)]
+          components: [buildDisabledControls(gameId)],
+          cardBackEmoji
         }));
 
         await sleep(DEALER_DRAW_DELAY_MS);
@@ -374,7 +392,8 @@ module.exports = {
             dealerCards,
             revealDealer: true,
             status: `${statusMessage}\nDealer rút thêm 1 lá...`,
-            components: [buildDisabledControls(gameId)]
+            components: [buildDisabledControls(gameId)],
+            cardBackEmoji
           }));
 
           await sleep(DEALER_DRAW_DELAY_MS);
@@ -399,7 +418,8 @@ module.exports = {
         dealerCards,
         revealDealer: true,
         status: summary,
-        components: [buildDisabledControls(gameId)]
+        components: [buildDisabledControls(gameId)],
+        cardBackEmoji
       }));
     };
 
@@ -449,7 +469,8 @@ module.exports = {
           dealerCards,
           revealDealer: false,
           status: "Bạn vừa **Hit**. Tiếp tục Hit hoặc Stand.",
-          components: [buildControls(gameId)]
+          components: [buildControls(gameId)],
+          cardBackEmoji
         }));
         return;
       }

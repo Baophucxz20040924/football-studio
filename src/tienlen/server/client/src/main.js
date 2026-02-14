@@ -5,7 +5,7 @@ import { PreloadScene } from './scenes/PreloadScene'
 import { GameScene } from './scenes/GameScene'
 import { socketEvents } from './socket/events'
 
-const SERVER_URL = 'http://localhost:3001'
+const SERVER_URL = `${window.location.protocol}//${window.location.hostname}:3001`
 
 const app = document.getElementById('app')
 app.innerHTML = `
@@ -148,7 +148,7 @@ const initSession = async () => {
     sessionUser = null
     localStorage.removeItem('tienlen_token')
     setProfileText()
-    window.tienLenHud.setStatus('Token đã hết hạn. Hãy lấy link mới từ lệnh /tienlen.')
+    window.tienLenHud.setStatus('Không xác thực được phiên. Kiểm tra token mới và TienLen server cổng 3001.')
   }
 }
 

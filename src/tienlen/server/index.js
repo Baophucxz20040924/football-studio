@@ -45,7 +45,6 @@ const getOrCreateDbUser = async (userId, userName) => {
     },
     $setOnInsert: {
       userId,
-      userName: userName || '',
       balance: STARTING_BALANCE,
     },
   }

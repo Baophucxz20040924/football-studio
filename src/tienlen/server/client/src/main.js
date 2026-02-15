@@ -6,9 +6,7 @@ import { GameScene } from './scenes/GameScene'
 import { socketEvents } from './socket/events'
 
 const SERVER_URL = `${window.location.protocol}//${window.location.hostname}:3001`
-const BASE_GAME_HEIGHT = 720
-const MIN_GAME_WIDTH = 1280
-const MAX_GAME_WIDTH = 2200
+const IS_MOBILE = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
 
 const app = document.getElementById('app')
 app.innerHTML = `
@@ -41,8 +39,8 @@ app.innerHTML = `
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
-  width: MIN_GAME_WIDTH,
-  height: BASE_GAME_HEIGHT,
+  width: 1280,
+  height: 720,
   resolution: Math.min(window.devicePixelRatio || 1, 2),
   autoRound: true,
   parent: 'game-root',
@@ -52,38 +50,11 @@ const game = new Phaser.Game({
     roundPixels: true,
   },
   scale: {
-    mode: Phaser.Scale.FIT,
+    mode: IS_MOBILE ? Phaser.Scale.ENVELOP : Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
   scene: [BootScene, PreloadScene, GameScene],
 })
-
-const computeGameSize = (viewportWidth, viewportHeight) => {
-  const safeViewportHeight = Math.max(1, viewportHeight)
-  const viewportRatio = viewportWidth / safeViewportHeight
-  const targetRatio = Math.max(16 / 9, viewportRatio)
-
-  const width = Math.min(MAX_GAME_WIDTH, Math.max(MIN_GAME_WIDTH, Math.round(BASE_GAME_HEIGHT * targetRatio)))
-  return {
-    width,
-    height: BASE_GAME_HEIGHT,
-  }
-}
-
-const syncGameScaleToViewport = () => {
-  const viewportWidth = gameShell?.clientWidth || window.innerWidth
-  const viewportHeight = gameShell?.clientHeight || window.innerHeight
-  if (viewportWidth <= 0 || viewportHeight <= 0) {
-    return
-  }
-
-  const size = computeGameSize(viewportWidth, viewportHeight)
-  if (game.scale.width !== size.width || game.scale.height !== size.height) {
-    game.scale.setGameSize(size.width, size.height)
-  }
-
-  game.scale.refresh()
-}
 
 window.tienLenHud = {
   setStatus(text) {
@@ -125,13 +96,6 @@ const setProfileText = () => {
 const enterGameScreen = () => {
   lobby?.classList.add('hidden')
   gameShell?.classList.remove('hidden')
-
-  requestAnimationFrame(() => {
-    syncGameScaleToViewport()
-    requestAnimationFrame(() => {
-      syncGameScaleToViewport()
-    })
-  })
 }
 
 createBtn?.addEventListener('click', () => {
@@ -191,24 +155,6 @@ const initSession = async () => {
 
 socketEvents.on('joined', () => {
   enterGameScreen()
-})
-
-window.addEventListener('resize', () => {
-  if (!gameShell?.classList.contains('hidden')) {
-    syncGameScaleToViewport()
-  }
-})
-
-window.addEventListener('orientationchange', () => {
-  if (!gameShell?.classList.contains('hidden')) {
-    setTimeout(syncGameScaleToViewport, 120)
-  }
-})
-
-window.visualViewport?.addEventListener('resize', () => {
-  if (!gameShell?.classList.contains('hidden')) {
-    syncGameScaleToViewport()
-  }
 })
 
 window.addEventListener('beforeunload', () => {

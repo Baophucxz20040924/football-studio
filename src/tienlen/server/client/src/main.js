@@ -6,9 +6,6 @@ import { GameScene } from './scenes/GameScene'
 import { socketEvents } from './socket/events'
 
 const SERVER_URL = `${window.location.protocol}//${window.location.hostname}:3001`
-const IS_TOUCH_DEVICE =
-  window.matchMedia('(pointer: coarse)').matches ||
-  (typeof navigator.maxTouchPoints === 'number' && navigator.maxTouchPoints > 0)
 
 const app = document.getElementById('app')
 app.innerHTML = `
@@ -52,7 +49,7 @@ const game = new Phaser.Game({
     roundPixels: true,
   },
   scale: {
-    mode: IS_TOUCH_DEVICE ? Phaser.Scale.RESIZE : Phaser.Scale.FIT,
+    mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
   scene: [BootScene, PreloadScene, GameScene],

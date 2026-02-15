@@ -98,6 +98,17 @@ const setProfileText = () => {
 const enterGameScreen = () => {
   lobby?.classList.add('hidden')
   gameShell?.classList.remove('hidden')
+
+  requestAnimationFrame(() => {
+    const width = gameShell?.clientWidth || window.innerWidth
+    const height = gameShell?.clientHeight || window.innerHeight
+
+    if (width > 0 && height > 0) {
+      game.scale.resize(width, height)
+    }
+
+    game.scale.refresh()
+  })
 }
 
 createBtn?.addEventListener('click', () => {

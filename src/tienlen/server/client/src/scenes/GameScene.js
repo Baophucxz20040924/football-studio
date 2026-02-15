@@ -44,6 +44,11 @@ export class GameScene extends Phaser.Scene {
     this.table = new Table(this, this.scale.width / 2, this.scale.height / 2 - 24)
 
     this.bindSocketEvents()
+    this.scale.on('resize', this.handleResize, this)
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.scale.off('resize', this.handleResize, this)
+    })
+    this.layoutResponsiveUI()
     window.tienLenHud?.setStatus('Nhập mã phòng để join hoặc chọn mức cược để tạo phòng.')
   }
 
@@ -124,27 +129,21 @@ export class GameScene extends Phaser.Scene {
   }
 
   createControls() {
-    const isCompactScreen = this.scale.width <= 900
-    const buttonWidth = isCompactScreen ? 148 : 128
-    const buttonHeight = isCompactScreen ? 56 : 46
-    const buttonFontSize = isCompactScreen ? '26px' : '22px'
-    const gap = isCompactScreen ? 14 : 12
-    const x = this.scale.width - (buttonWidth / 2 + 16)
-    const firstY = this.scale.height / 2 - (buttonHeight + gap)
-
-    this.playBtn = this.createButton(x, firstY, 'Đánh', () => {
+    this.playBtn = this.createButton(0, 0, 'Đánh', () => {
       if (this.selectedCardIds.length > 0) {
         socketEvents.playCards(this.selectedCardIds)
       }
-    }, { width: buttonWidth, height: buttonHeight, fontSize: buttonFontSize })
+    })
 
-    this.passBtn = this.createButton(x, firstY + buttonHeight + gap, 'Pass', () => {
+    this.passBtn = this.createButton(0, 0, 'Pass', () => {
       socketEvents.pass()
-    }, { width: buttonWidth, height: buttonHeight, fontSize: buttonFontSize })
+    })
 
-    this.startBtn = this.createButton(x, firstY + (buttonHeight + gap) * 2, 'Start', () => {
+    this.startBtn = this.createButton(0, 0, 'Start', () => {
       socketEvents.startGame()
-    }, { width: buttonWidth, height: buttonHeight, fontSize: buttonFontSize })
+    })
+
+    this.layoutControlButtons()
   }
 
   createButton(x, y, label, onClick, options = {}) {
@@ -169,6 +168,132 @@ export class GameScene extends Phaser.Scene {
     } else {
       button.bg.disableInteractive()
     }
+  }
+
+  getViewportInsets() {
+    const gameWidth = this.scale.width
+    const gameHeight = this.scale.height
+    const parentWidth = this.scale.parentSize?.width || gameWidth
+    const parentHeight = this.scale.parentSize?.height || gameHeight
+    const scaleX = this.scale.displayScale?.x || 1
+    const scaleY = this.scale.displayScale?.y || 1
+
+    const visibleWorldWidth = Math.min(gameWidth, parentWidth / scaleX)
+    const visibleWorldHeight = Math.min(gameHeight, parentHeight / scaleY)
+
+    const horizontalInset = Math.max(0, (gameWidth - visibleWorldWidth) / 2)
+    const verticalInset = Math.max(0, (gameHeight - visibleWorldHeight) / 2)
+
+    return {
+      left: horizontalInset,
+      right: horizontalInset,
+      top: verticalInset,
+      bottom: verticalInset,
+    }
+  }
+
+  layoutControlButtons() {
+    if (!this.playBtn || !this.passBtn || !this.startBtn) {
+      return
+    }
+
+    const insets = this.getViewportInsets()
+    const safeWidth = this.scale.width - insets.left - insets.right
+    const isCompactScreen = safeWidth <= 900
+    const buttonWidth = isCompactScreen ? 148 : 128
+    const buttonHeight = isCompactScreen ? 56 : 46
+    const buttonFontSize = isCompactScreen ? '26px' : '22px'
+    const gap = isCompactScreen ? 14 : 12
+    const x = this.scale.width - insets.right - (buttonWidth / 2 + 18)
+    const bottomPadding = isCompactScreen ? 22 : 18
+    const firstY =
+      this.scale.height -
+      insets.bottom -
+      bottomPadding -
+      (buttonHeight * 2 + gap * 2) -
+      buttonHeight / 2
+
+    const applyButtonLayout = (button, y) => {
+      button.bg.setSize(buttonWidth, buttonHeight)
+      button.bg.setPosition(x, y)
+      button.text.setPosition(x, y)
+      button.text.setFontSize(buttonFontSize)
+    }
+
+    applyButtonLayout(this.playBtn, firstY)
+    applyButtonLayout(this.passBtn, firstY + buttonHeight + gap)
+    applyButtonLayout(this.startBtn, firstY + (buttonHeight + gap) * 2)
+  }
+
+  layoutResponsiveUI() {
+    const insets = this.getViewportInsets()
+    const topY = insets.top + 14
+
+    if (this.roomCodeText) {
+      this.roomCodeText.setPosition(insets.left + 16, topY)
+    }
+
+    if (this.betText) {
+      this.betText.setPosition(insets.left + 16, topY + 42)
+    }
+
+    if (this.balanceText) {
+      this.balanceText.setPosition(this.scale.width - insets.right - 16, topY)
+    }
+
+    if (this.moneyEventText) {
+      this.moneyEventText.setPosition(insets.left + 16, topY + 74)
+      this.moneyEventText.setWordWrapWidth(
+        Math.max(240, this.scale.width - insets.left - insets.right - 32),
+      )
+    }
+
+    const seatPoints = {
+      0: { x: this.scale.width / 2, y: this.scale.height - insets.bottom - 272 },
+      1: { x: insets.left + 120, y: this.scale.height / 2 },
+      2: { x: this.scale.width / 2, y: insets.top + 56 },
+      3: { x: this.scale.width - insets.right - 120, y: this.scale.height / 2 },
+    }
+
+    Object.entries(seatPoints).forEach(([seat, point]) => {
+      const seatNum = Number(seat)
+      if (this.turnRings[seatNum]) {
+        this.turnRings[seatNum].setPosition(point.x, point.y)
+      }
+      if (this.nameTexts[seatNum]) {
+        this.nameTexts[seatNum].setPosition(point.x, point.y - 14)
+      }
+      if (this.countTexts[seatNum]) {
+        this.countTexts[seatNum].setPosition(point.x, point.y + 14)
+      }
+    })
+
+    if (this.infoText) {
+      const infoY = Math.min(this.scale.height - insets.bottom - 90, this.scale.height / 2 + 128)
+      this.infoText.setPosition(this.scale.width / 2, infoY)
+    }
+
+    if (this.table?.group) {
+      this.table.group.setPosition(this.scale.width / 2, this.scale.height / 2 - 24)
+    }
+
+    if (this.table?.comboText) {
+      this.table.comboText.setPosition(this.scale.width / 2, this.scale.height / 2 + 68)
+    }
+
+    if (this.hand) {
+      this.hand.x = this.scale.width / 2
+      this.hand.y = this.scale.height - insets.bottom - 118
+      this.hand.width = Math.max(480, this.scale.width - insets.left - insets.right - 220)
+      this.hand.layout()
+    }
+
+    this.layoutControlButtons()
+    this.refreshSeatUI()
+  }
+
+  handleResize() {
+    this.layoutResponsiveUI()
   }
 
   bindSocketEvents() {

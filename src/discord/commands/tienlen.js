@@ -10,7 +10,7 @@ const { createTienLenToken, TOKEN_TTL_MS } = require("../../tienlen/token");
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("tienlen")
-    .setDescription("Mo game Tien Len Mien Bac"),
+    .setDescription("Mở game Tiến lên Miền Trung"),
   async execute(interaction) {
     const userName = interaction.user.globalName || interaction.user.username;
     await getOrCreateUser(interaction.user.id, userName);
@@ -20,17 +20,17 @@ module.exports = {
     const link = `${baseUrl}/tienlen?token=${encodeURIComponent(token)}`;
 
     const embed = buildEmbed({
-      title: "Tien Len Mien Bac 🃏",
+      title: "Tiến lên Miền Trung 🃏",
       description:
-        "Nhan nut ben duoi de vao game. Link co hieu luc trong " +
+        "Nhấn nút bên dưới để vào game. Link có hiệu lực trong " +
         Math.round(TOKEN_TTL_MS / 60000) +
-        " phut.",
+        " phút.",
       color: 0xf59e0b
     });
 
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
-        .setLabel("Vao game")
+        .setLabel("Vào game")
         .setStyle(ButtonStyle.Link)
         .setURL(link)
     );

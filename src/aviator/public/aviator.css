@@ -28,6 +28,7 @@ body {
     radial-gradient(900px 500px at 0% 20%, #1a1224 0%, transparent 55%),
     linear-gradient(160deg, #0a0f14 0%, #0e141b 60%, #0b0f14 100%);
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 @supports (-webkit-touch-callout: none) {
@@ -728,6 +729,15 @@ main {
   .game {
     grid-template-columns: 1fr;
   }
+
+  .bet-panel {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .balance,
+  .user-note {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (max-width: 600px) {
@@ -770,8 +780,31 @@ main {
   }
 
   .bet-panel {
+    grid-template-columns: 1fr;
     padding: 14px;
     gap: 12px;
+  }
+
+  .board-top {
+    gap: 10px;
+    align-items: flex-start;
+    justify-content: flex-start;
+  }
+
+  .multiplier {
+    font-size: clamp(30px, 10vw, 42px);
+  }
+
+  .crash-label {
+    width: 100%;
+  }
+
+  .flight-chart {
+    height: 150px;
+  }
+
+  .round-bet {
+    flex-wrap: wrap;
   }
 
   .balance {
@@ -803,7 +836,7 @@ main {
 
   .field input {
     padding: 8px 10px;
-    font-size: 13px;
+    font-size: 16px;
   }
 
   .bet-actions {
@@ -823,5 +856,11 @@ main {
 
   .bet-status {
     font-size: 12px;
+  }
+}
+
+@media (max-width: 420px) {
+  .bet-actions {
+    grid-template-columns: 1fr;
   }
 }

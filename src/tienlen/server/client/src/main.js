@@ -11,7 +11,7 @@ const app = document.getElementById('app')
 app.innerHTML = `
   <div id="lobby-screen">
     <div id="lobby-card">
-      <h1>Tiến Lên Miền Bắc</h1>
+      <h1>Tiến Lên Miền Trung</h1>
       <p>Tạo phòng hoặc vào phòng bằng mã.</p>
       <div id="profileText">Đang xác thực...</div>
       <input id="roomInput" placeholder="Mã phòng" maxlength="10" />
@@ -89,7 +89,7 @@ const setProfileText = () => {
     return
   }
 
-  profileText.textContent = `Người chơi: ${sessionUser.userName} | ID: ${sessionUser.userId} | Số dư: ${sessionUser.balance}`
+  profileText.textContent = `Người chơi: ${sessionUser.userName} | Số dư: ${sessionUser.balance}`
 }
 
 const enterGameScreen = () => {

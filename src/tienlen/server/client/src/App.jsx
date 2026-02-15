@@ -138,7 +138,7 @@ function App() {
     return (
       <main className="screen">
         <section className="panel">
-          <h1>Tiến Lên Miền Bắc Multiplayer</h1>
+          <h1>Tiến Lên Miền Trung Multiplayer</h1>
           <p>Tạo phòng hoặc nhập mã phòng để chơi từ 2-4 người.</p>
 
           <label>

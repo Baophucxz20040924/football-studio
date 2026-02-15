@@ -282,9 +282,85 @@ const settleEndGameMoney = (room, winnerId) => {
     const extraUnits = getThoiExtraUnits(hand)
     const totalUnits = baseUnits + extraUnits
 
-    const reason = isCong ? 'Cóng' : `${hand.length} lá còn`
-    transferMoney(room, player.id, winnerId, totalUnits, `${reason}${extraUnits > 0 ? ` + thối ${extraUnits} lá` : ''}`)
+    const reason = isCong ? 'Cóng' : `${hand.length} lá còn lại`
+    transferMoney(room, player.id, winnerId, totalUnits, `${reason}${extraUnits > 0 ? ` + thối lá ${extraUnits}` : ''}`)
   }
+
+  settlePendingLeavePenalties(room, winnerId)
+}
+
+const getLeavePenaltyUnits = (hand) => {
+  if (!Array.isArray(hand) || hand.length === 0) {
+    return 0
+  }
+
+  const baseUnits = hand.length
+  const extraUnits = getThoiExtraUnits(hand)
+  return baseUnits + extraUnits
+}
+
+const recordLeavePenalty = (room, player, hand) => {
+  if (!room?.game?.started || !player?.userId) {
+    return
+  }
+
+  const units = getLeavePenaltyUnits(hand)
+  if (units <= 0) {
+    return
+  }
+
+  room.game.pendingLeavePenalties = room.game.pendingLeavePenalties || []
+  room.game.pendingLeavePenalties.push({
+    userId: player.userId,
+    name: player.name,
+    units,
+    cardCount: hand.length,
+    extraUnits: Math.max(0, units - hand.length),
+  })
+
+  const amount = units * room.betUnit
+  pushMoneyEvent(room, `Rời bàn (phạt chờ xử): ${player.name} -${amount}`)
+}
+
+const settlePendingLeavePenalties = (room, winnerId) => {
+  const game = room.game
+  const penalties = game?.pendingLeavePenalties || []
+
+  if (!winnerId || penalties.length === 0) {
+    return
+  }
+
+  const winner = room.players.find((player) => player.id === winnerId)
+  if (!winner?.userId) {
+    return
+  }
+
+  room.money[winnerId] = room.money[winnerId] || 0
+
+  for (const penalty of penalties) {
+    const amount = penalty.units * room.betUnit
+    room.money[winnerId] += amount
+
+    applyBalanceDelta(penalty.userId, -amount).catch((err) => {
+      console.error('Failed to apply leave penalty debit', {
+        userId: penalty.userId,
+        err: err?.message || err,
+      })
+    })
+
+    applyBalanceDelta(winner.userId, amount).catch((err) => {
+      console.error('Failed to apply leave penalty credit', {
+        userId: winner.userId,
+        err: err?.message || err,
+      })
+    })
+
+    const baseText = `${penalty.cardCount} lá còn lại`
+    const thoiText = penalty.extraUnits > 0 ? ` + thối lá ${penalty.extraUnits} ` : ''
+    pushMoneyEvent(room, `Rời bàn phạt (${baseText}${thoiText}): ${penalty.name} -> ${winner.name}: ${amount}`)
+  }
+
+  game.pendingLeavePenalties = []
 }
 
 const getSingleTwoChopUnits = (combo) => {
@@ -489,6 +565,7 @@ const setupGame = (room) => {
     winnerId: null,
     firstTurnPending: !room.previousWinnerId && !!threeSpadesHolderId,
     chopState: null,
+    pendingLeavePenalties: [],
   }
 
   room.infoMessage = room.previousWinnerId
@@ -568,6 +645,91 @@ const advanceTurnAfterPass = (room) => {
       return
     }
   }
+}
+
+const normalizeTurnIndexAfterPlayerLeave = (room, removedPlayerId, removedIndex) => {
+  const game = room.game
+  if (!game || room.players.length === 0) {
+    return
+  }
+
+  if (removedIndex < game.turnIndex) {
+    game.turnIndex -= 1
+  } else if (removedIndex === game.turnIndex) {
+    if (game.turnIndex >= room.players.length) {
+      game.turnIndex = 0
+    }
+  }
+
+  if (game.turnIndex >= room.players.length) {
+    game.turnIndex = 0
+  }
+}
+
+const handleParticipantExit = (room, participantId, reasonText) => {
+  const game = room.game
+  const leavingPlayer = room.players.find((player) => player.id === participantId)
+  const leavingPlayerIndex = room.players.findIndex((player) => player.id === participantId)
+
+  if (leavingPlayer && game?.started) {
+    const leavingHand = game.hands?.[participantId] || []
+    recordLeavePenalty(room, leavingPlayer, leavingHand)
+
+    delete game.hands[participantId]
+    game.passes = new Set([...game.passes].filter((id) => id !== participantId))
+
+    if (game.currentTrick?.playerId === participantId) {
+      game.currentTrick = null
+      game.passes = new Set()
+      game.chopState = null
+      room.infoMessage = `${leavingPlayer.name} đã rời bàn, lượt mới được mở lại.`
+    }
+  }
+
+  room.players = room.players.filter((player) => player.id !== participantId)
+  room.spectators = (room.spectators || []).filter((spectator) => spectator.id !== participantId)
+
+  if (leavingPlayer && game?.started) {
+    normalizeTurnIndexAfterPlayerLeave(room, participantId, leavingPlayerIndex)
+  }
+
+  if (room.players.length === 0) {
+    clearAutoStartTimer(room)
+    return { shouldDeleteRoom: true }
+  }
+
+  if (room.ownerId === participantId) {
+    room.ownerId = room.players[0].id
+  }
+
+  if (game?.started && room.players.length === 1) {
+    const winnerId = room.players[0].id
+    game.started = false
+    game.winnerId = winnerId
+    room.previousWinnerId = winnerId
+    settlePendingLeavePenalties(room, winnerId)
+    const promotedNames = promoteWaitingSpectators(room)
+    room.infoMessage = `${room.players[0].name} thắng ván do các người chơi khác rời bàn.`
+    if (promotedNames.length > 0) {
+      room.infoMessage += ` ${promotedNames.join(', ')} sẽ vào vai người chơi ở ván kế tiếp.`
+    }
+    emitRoomState(room)
+    scheduleAutoStartNextRound(room)
+    return { shouldDeleteRoom: false, emitted: true }
+  }
+
+  if (room.players.length < 2) {
+    clearAutoStartTimer(room)
+    room.game = null
+    room.infoMessage = reasonText
+    return { shouldDeleteRoom: false }
+  }
+
+  if (leavingPlayer) {
+    room.infoMessage = `${leavingPlayer.name} đã rời phòng.`
+  }
+
+  return { shouldDeleteRoom: false }
 }
 
 io.on('connection', (socket) => {
@@ -829,22 +991,13 @@ io.on('connection', (socket) => {
       return
     }
 
-    room.players = room.players.filter((player) => player.id !== socket.id)
-    room.spectators = (room.spectators || []).filter((spectator) => spectator.id !== socket.id)
-
-    if (room.ownerId === socket.id && room.players.length > 0) {
-      room.ownerId = room.players[0].id
-    }
-
-    if (room.players.length < 2) {
-      clearAutoStartTimer(room)
-      room.game = null
-      room.infoMessage = 'Chưa đủ người chơi để tiếp tục.'
-    }
-
-    if (room.players.length === 0) {
-      clearAutoStartTimer(room)
+    const result = handleParticipantExit(room, socket.id, 'Chưa đủ người chơi để tiếp tục.')
+    if (result.shouldDeleteRoom) {
       rooms.delete(code)
+      return
+    }
+
+    if (result.emitted) {
       return
     }
 
@@ -859,26 +1012,15 @@ io.on('connection', (socket) => {
         continue
       }
 
-      room.players = room.players.filter((player) => player.id !== socket.id)
-      room.spectators = (room.spectators || []).filter((spectator) => spectator.id !== socket.id)
-
-      if (room.players.length === 0) {
-        clearAutoStartTimer(room)
+      const result = handleParticipantExit(room, socket.id, 'Một người vừa rời phòng. Cần tối thiểu 2 người.')
+      if (result.shouldDeleteRoom) {
         rooms.delete(code)
         continue
       }
 
-      if (room.ownerId === socket.id) {
-        room.ownerId = room.players[0].id
+      if (!result.emitted) {
+        emitRoomState(room)
       }
-
-      if (room.players.length < 2) {
-        clearAutoStartTimer(room)
-        room.game = null
-        room.infoMessage = 'Một người vừa rời phòng. Cần tối thiểu 2 người.'
-      }
-
-      emitRoomState(room)
     }
   })
 })

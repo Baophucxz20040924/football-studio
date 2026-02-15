@@ -20,6 +20,7 @@ body {
     linear-gradient(135deg, #0b0f1a, #0a1324);
   color: var(--text);
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 .bg-orb {
@@ -142,6 +143,8 @@ select {
   padding: 10px 12px;
   color: var(--text);
   font-family: inherit;
+  width: 100%;
+  min-width: 0;
 }
 
 textarea {
@@ -314,6 +317,41 @@ button:hover {
 @media (max-width: 640px) {
   .page {
     padding: 28px 16px 56px;
+  }
+
+  .tabs {
+    gap: 8px;
+  }
+
+  .tab-btn {
+    flex: 1 1 calc(50% - 8px);
+    text-align: center;
+    padding: 10px 12px;
+  }
+
+  .panel {
+    padding: 16px;
+    border-radius: 16px;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .odds-row,
+  .score-row,
+  .goals-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .live-row {
+    align-items: stretch;
+  }
+
+  .small-btn {
+    width: 100%;
   }
 
   button {

@@ -17,7 +17,7 @@ export class GameScene extends Phaser.Scene {
   constructor() {
     super('GameScene')
     this.playersBySeat = {}
-    this.mySeat = 0
+    this.mySeat = -1
     this.currentTurn = -1
     this.tableState = { cards: [], combo: '' }
     this.selectedCardIds = []
@@ -58,6 +58,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   createSeatUI() {
+    const isCompactScreen = this.scale.width <= 900
+    const nameFontSize = isCompactScreen ? '16px' : '20px'
+    const countFontSize = isCompactScreen ? '14px' : '16px'
+
     this.roomCodeText = this.add
       .text(16, 14, 'Phòng: ----', {
         fontSize: '20px',
@@ -94,22 +98,17 @@ export class GameScene extends Phaser.Scene {
       })
       .setDepth(1000)
 
-    const anchors = {
-      0: { x: this.scale.width / 2, y: this.scale.height - 272 },
-      1: { x: 120, y: this.scale.height / 2 },
-      2: { x: this.scale.width / 2, y: 56 },
-      3: { x: this.scale.width - 120, y: this.scale.height / 2 },
-    }
+    const anchors = this.getSeatAnchors()
 
     Object.entries(anchors).forEach(([seat, point]) => {
       const seatNum = Number(seat)
       this.turnRings[seatNum] = this.add.circle(point.x, point.y, 44, 0xffffff, 0.1).setVisible(false)
       this.nameTexts[seatNum] = this.add
-        .text(point.x, point.y - 14, 'Waiting...', { fontSize: '20px', color: '#ffffff' })
+        .text(point.x, point.y - 14, 'Waiting...', { fontSize: nameFontSize, color: '#ffffff' })
         .setOrigin(0.5)
 
       this.countTexts[seatNum] = this.add
-        .text(point.x, point.y + 14, '', { fontSize: '16px', color: '#ffe082' })
+        .text(point.x, point.y + 14, '', { fontSize: countFontSize, color: '#ffe082' })
         .setOrigin(0.5)
 
       this.waitingTexts[seatNum] = this.nameTexts[seatNum]
@@ -130,7 +129,9 @@ export class GameScene extends Phaser.Scene {
     const buttonFontSize = isCompactScreen ? '26px' : '22px'
     const gap = isCompactScreen ? 14 : 12
     const x = this.scale.width - (buttonWidth / 2 + 16)
-    const firstY = this.scale.height / 2 - (buttonHeight + gap)
+    const totalHeight = buttonHeight * 3 + gap * 2
+    const topY = this.scale.height - totalHeight - 20
+    const firstY = topY + buttonHeight / 2
 
     this.playBtn = this.createButton(x, firstY, 'Đánh', () => {
       if (this.selectedCardIds.length > 0) {
@@ -145,6 +146,29 @@ export class GameScene extends Phaser.Scene {
     this.startBtn = this.createButton(x, firstY + (buttonHeight + gap) * 2, 'Start', () => {
       socketEvents.startGame()
     }, { width: buttonWidth, height: buttonHeight, fontSize: buttonFontSize })
+  }
+
+  getSeatAnchors() {
+    const isCompactScreen = this.scale.width <= 900
+    const sideInset = isCompactScreen ? 90 : 120
+    const topY = isCompactScreen ? 72 : 56
+    const sideY = this.scale.height / 2
+    const bottomY = this.scale.height - (isCompactScreen ? 244 : 272)
+
+    return {
+      0: { x: this.scale.width / 2, y: bottomY },
+      1: { x: sideInset, y: sideY },
+      2: { x: this.scale.width / 2, y: topY },
+      3: { x: this.scale.width - sideInset, y: sideY },
+    }
+  }
+
+  getVisualSeat(absoluteSeat) {
+    if (!Number.isInteger(absoluteSeat) || this.mySeat < 0) {
+      return absoluteSeat
+    }
+
+    return (absoluteSeat - this.mySeat + 4) % 4
   }
 
   createButton(x, y, label, onClick, options = {}) {
@@ -289,25 +313,33 @@ export class GameScene extends Phaser.Scene {
   }
 
   refreshSeatUI(handsCount = {}) {
-    for (let seat = 0; seat < 4; seat += 1) {
-      const player = this.playersBySeat[seat]
+    for (let visualSeat = 0; visualSeat < 4; visualSeat += 1) {
+      this.nameTexts[visualSeat].setText('Waiting...')
+      this.countTexts[visualSeat].setText('')
+      this.turnRings[visualSeat].setVisible(false)
+      this.clearBackStack(visualSeat)
+    }
+
+    for (let absoluteSeat = 0; absoluteSeat < 4; absoluteSeat += 1) {
+      const player = this.playersBySeat[absoluteSeat]
       if (!player) {
-        this.nameTexts[seat].setText('Waiting...')
-        this.countTexts[seat].setText('')
-        this.turnRings[seat].setVisible(false)
-        this.clearBackStack(seat)
         continue
       }
 
-      this.nameTexts[seat].setText(player.name)
-      const count = handsCount[seat] ?? player.cardCount ?? 0
-      this.countTexts[seat].setText(`${count} lá`)
-      this.turnRings[seat].setVisible(this.currentTurn === seat)
+      const visualSeat = this.getVisualSeat(absoluteSeat)
+      if (!Number.isInteger(visualSeat) || !this.nameTexts[visualSeat]) {
+        continue
+      }
 
-      if (seat !== this.mySeat) {
-        this.renderBackStack(seat, count)
+      this.nameTexts[visualSeat].setText(player.name)
+      const count = handsCount[absoluteSeat] ?? player.cardCount ?? 0
+      this.countTexts[visualSeat].setText(`${count} lá`)
+      this.turnRings[visualSeat].setVisible(this.currentTurn === absoluteSeat)
+
+      if (absoluteSeat !== this.mySeat) {
+        this.renderBackStack(visualSeat, count)
       } else {
-        this.clearBackStack(seat)
+        this.clearBackStack(visualSeat)
       }
     }
   }

@@ -192,23 +192,38 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  getSafeBounds() {
+    const insets = this.getViewportInsets()
+    const left = insets.left
+    const right = this.scale.width - insets.right
+    const top = insets.top
+    const bottom = this.scale.height - insets.bottom
+
+    return {
+      left,
+      right,
+      top,
+      bottom,
+      width: Math.max(0, right - left),
+      height: Math.max(0, bottom - top),
+    }
+  }
+
   layoutControlButtons() {
     if (!this.playBtn || !this.passBtn || !this.startBtn) {
       return
     }
 
-    const insets = this.getViewportInsets()
-    const safeWidth = this.scale.width - insets.left - insets.right
-    const isCompactScreen = safeWidth <= 900
+    const safe = this.getSafeBounds()
+    const isCompactScreen = safe.width <= 900
     const buttonWidth = isCompactScreen ? 148 : 128
     const buttonHeight = isCompactScreen ? 56 : 46
     const buttonFontSize = isCompactScreen ? '26px' : '22px'
     const gap = isCompactScreen ? 14 : 12
-    const x = this.scale.width - insets.right - (buttonWidth / 2 + 18)
+    const x = safe.right - (buttonWidth / 2 + 14)
     const bottomPadding = isCompactScreen ? 22 : 18
     const firstY =
-      this.scale.height -
-      insets.bottom -
+      safe.bottom -
       bottomPadding -
       (buttonHeight * 2 + gap * 2) -
       buttonHeight / 2
@@ -226,33 +241,44 @@ export class GameScene extends Phaser.Scene {
   }
 
   layoutResponsiveUI() {
-    const insets = this.getViewportInsets()
-    const topY = insets.top + 14
+    const safe = this.getSafeBounds()
+    const isCompactScreen = safe.width <= 900
+    const topY = safe.top + 10
+    const hudGapY = isCompactScreen ? 34 : 38
+    const buttonColumnWidth = isCompactScreen ? 186 : 154
+    const rightSeatOffset = isCompactScreen ? 122 : 110
+    const leftSeatOffset = isCompactScreen ? 98 : 110
+    const topSeatY = safe.top + (isCompactScreen ? 118 : 96)
+    const middleY = safe.top + safe.height * (isCompactScreen ? 0.47 : 0.5)
 
     if (this.roomCodeText) {
-      this.roomCodeText.setPosition(insets.left + 16, topY)
+      this.roomCodeText.setPosition(safe.left + 14, topY)
+      this.roomCodeText.setFontSize(isCompactScreen ? 18 : 20)
     }
 
     if (this.betText) {
-      this.betText.setPosition(insets.left + 16, topY + 42)
+      this.betText.setPosition(safe.left + 14, topY + hudGapY)
+      this.betText.setFontSize(isCompactScreen ? 16 : 18)
     }
 
     if (this.balanceText) {
-      this.balanceText.setPosition(this.scale.width - insets.right - 16, topY)
+      this.balanceText.setPosition(safe.right - 14, topY)
+      this.balanceText.setFontSize(isCompactScreen ? 17 : 18)
     }
 
     if (this.moneyEventText) {
-      this.moneyEventText.setPosition(insets.left + 16, topY + 74)
+      this.moneyEventText.setPosition(safe.left + 14, topY + hudGapY * 2)
+      this.moneyEventText.setFontSize(isCompactScreen ? 14 : 16)
       this.moneyEventText.setWordWrapWidth(
-        Math.max(240, this.scale.width - insets.left - insets.right - 32),
+        Math.max(220, safe.width - buttonColumnWidth - 34),
       )
     }
 
     const seatPoints = {
-      0: { x: this.scale.width / 2, y: this.scale.height - insets.bottom - 272 },
-      1: { x: insets.left + 120, y: this.scale.height / 2 },
-      2: { x: this.scale.width / 2, y: insets.top + 56 },
-      3: { x: this.scale.width - insets.right - 120, y: this.scale.height / 2 },
+      0: { x: this.scale.width / 2, y: safe.bottom - (isCompactScreen ? 246 : 272) },
+      1: { x: safe.left + leftSeatOffset, y: middleY },
+      2: { x: this.scale.width / 2, y: topSeatY },
+      3: { x: safe.right - buttonColumnWidth - rightSeatOffset, y: middleY },
     }
 
     Object.entries(seatPoints).forEach(([seat, point]) => {
@@ -262,29 +288,33 @@ export class GameScene extends Phaser.Scene {
       }
       if (this.nameTexts[seatNum]) {
         this.nameTexts[seatNum].setPosition(point.x, point.y - 14)
+        this.nameTexts[seatNum].setFontSize(isCompactScreen ? 16 : 20)
       }
       if (this.countTexts[seatNum]) {
         this.countTexts[seatNum].setPosition(point.x, point.y + 14)
+        this.countTexts[seatNum].setFontSize(isCompactScreen ? 14 : 16)
       }
     })
 
     if (this.infoText) {
-      const infoY = Math.min(this.scale.height - insets.bottom - 90, this.scale.height / 2 + 128)
+      const infoY = safe.bottom - (isCompactScreen ? 132 : 108)
       this.infoText.setPosition(this.scale.width / 2, infoY)
+      this.infoText.setFontSize(isCompactScreen ? 15 : 18)
     }
 
     if (this.table?.group) {
-      this.table.group.setPosition(this.scale.width / 2, this.scale.height / 2 - 24)
+      this.table.group.setPosition(this.scale.width / 2, safe.top + safe.height * (isCompactScreen ? 0.45 : 0.48))
     }
 
     if (this.table?.comboText) {
-      this.table.comboText.setPosition(this.scale.width / 2, this.scale.height / 2 + 68)
+      this.table.comboText.setPosition(this.scale.width / 2, safe.top + safe.height * (isCompactScreen ? 0.62 : 0.6))
+      this.table.comboText.setFontSize(isCompactScreen ? 16 : 20)
     }
 
     if (this.hand) {
       this.hand.x = this.scale.width / 2
-      this.hand.y = this.scale.height - insets.bottom - 118
-      this.hand.width = Math.max(480, this.scale.width - insets.left - insets.right - 220)
+      this.hand.y = safe.bottom - (isCompactScreen ? 96 : 118)
+      this.hand.width = Math.max(420, safe.width - (isCompactScreen ? 240 : 220))
       this.hand.layout()
     }
 

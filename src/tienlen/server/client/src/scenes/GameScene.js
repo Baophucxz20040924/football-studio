@@ -124,25 +124,38 @@ export class GameScene extends Phaser.Scene {
   }
 
   createControls() {
-    const x = this.scale.width - 92
-    this.playBtn = this.createButton(x, this.scale.height / 2 - 80, 'Đánh', () => {
+    const isCompactScreen = this.scale.width <= 900
+    const buttonWidth = isCompactScreen ? 148 : 128
+    const buttonHeight = isCompactScreen ? 56 : 46
+    const buttonFontSize = isCompactScreen ? '26px' : '22px'
+    const gap = isCompactScreen ? 14 : 12
+    const x = this.scale.width - (buttonWidth / 2 + 16)
+    const firstY = this.scale.height / 2 - (buttonHeight + gap)
+
+    this.playBtn = this.createButton(x, firstY, 'Đánh', () => {
       if (this.selectedCardIds.length > 0) {
         socketEvents.playCards(this.selectedCardIds)
       }
-    })
+    }, { width: buttonWidth, height: buttonHeight, fontSize: buttonFontSize })
 
-    this.passBtn = this.createButton(x, this.scale.height / 2 - 28, 'Pass', () => {
+    this.passBtn = this.createButton(x, firstY + buttonHeight + gap, 'Pass', () => {
       socketEvents.pass()
-    })
+    }, { width: buttonWidth, height: buttonHeight, fontSize: buttonFontSize })
 
-    this.startBtn = this.createButton(x, this.scale.height / 2 + 24, 'Start', () => {
+    this.startBtn = this.createButton(x, firstY + (buttonHeight + gap) * 2, 'Start', () => {
       socketEvents.startGame()
-    })
+    }, { width: buttonWidth, height: buttonHeight, fontSize: buttonFontSize })
   }
 
-  createButton(x, y, label, onClick) {
-    const bg = this.add.rectangle(x, y, 100, 36, 0x1b1f23).setStrokeStyle(2, 0xffffff)
-    const text = this.add.text(x, y, label, { fontSize: '18px', color: '#ffffff' }).setOrigin(0.5)
+  createButton(x, y, label, onClick, options = {}) {
+    const width = options.width || 128
+    const height = options.height || 46
+    const fontSize = options.fontSize || '22px'
+
+    const bg = this.add.rectangle(x, y, width, height, 0x1b1f23).setStrokeStyle(2, 0xffffff)
+    const text = this.add
+      .text(x, y, label, { fontSize, fontStyle: '700', color: '#ffffff' })
+      .setOrigin(0.5)
     bg.setInteractive({ useHandCursor: true })
     bg.on('pointerdown', onClick)
     return { bg, text, enabled: true }

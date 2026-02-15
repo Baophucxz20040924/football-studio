@@ -6,6 +6,7 @@ import { GameScene } from './scenes/GameScene'
 import { socketEvents } from './socket/events'
 
 const SERVER_URL = `${window.location.protocol}//${window.location.hostname}:3001`
+const IS_MOBILE = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
 
 const app = document.getElementById('app')
 app.innerHTML = `
@@ -49,7 +50,7 @@ const game = new Phaser.Game({
     roundPixels: true,
   },
   scale: {
-    mode: Phaser.Scale.FIT,
+    mode: IS_MOBILE ? Phaser.Scale.ENVELOP : Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
   scene: [BootScene, PreloadScene, GameScene],

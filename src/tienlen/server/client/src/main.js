@@ -52,7 +52,7 @@ const game = new Phaser.Game({
     roundPixels: true,
   },
   scale: {
-    mode: IS_TOUCH_DEVICE ? Phaser.Scale.ENVELOP : Phaser.Scale.FIT,
+    mode: IS_TOUCH_DEVICE ? Phaser.Scale.RESIZE : Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
   scene: [BootScene, PreloadScene, GameScene],

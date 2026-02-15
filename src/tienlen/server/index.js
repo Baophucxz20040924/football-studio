@@ -30,6 +30,20 @@ const MIN_ENTRY_MULTIPLIER = Number(process.env.TIENLEN_MIN_ENTRY_MULTIPLIER || 
 
 const rooms = new Map()
 
+const findParticipantByUserId = (room, userId) => {
+  const activePlayer = room.players.find((participant) => participant.userId === userId)
+  if (activePlayer) {
+    return { role: 'player', participant: activePlayer }
+  }
+
+  const spectator = (room.spectators || []).find((participant) => participant.userId === userId)
+  if (spectator) {
+    return { role: 'spectator', participant: spectator }
+  }
+
+  return null
+}
+
 const getMinimumEntryBalance = (betUnit) => Math.max(0, Number(betUnit || 0) * MIN_ENTRY_MULTIPLIER)
 
 const normalizeUserId = (value) => String(value || '').trim().slice(0, 64)
@@ -326,6 +340,7 @@ const processImmediateChopMoney = (room, newPlayerId, newCombo, prevTrick) => {
 const buildStateForPlayer = (room, playerId) => {
   const game = room.game
   const myHand = game?.hands?.[playerId] ?? []
+  const isSpectator = !room.players.some((player) => player.id === playerId)
 
   return {
     roomCode: room.code,
@@ -339,6 +354,10 @@ const buildStateForPlayer = (room, playerId) => {
       isTurn: game ? game.turnIndex === index : false,
       money: room.money?.[player.id] ?? 0,
     })),
+    spectators: (room.spectators || []).map((spectator) => ({
+      id: spectator.id,
+      name: spectator.name,
+    })),
     game: game
       ? {
           started: game.started,
@@ -347,6 +366,7 @@ const buildStateForPlayer = (room, playerId) => {
           winnerId: game.winnerId,
           firstTurnPending: game.firstTurnPending,
           myHand,
+          isSpectator,
           canStart: room.ownerId === playerId && room.players.length >= 2,
         }
       : {
@@ -356,6 +376,7 @@ const buildStateForPlayer = (room, playerId) => {
           winnerId: null,
           firstTurnPending: false,
           myHand: [],
+          isSpectator,
           canStart: room.ownerId === playerId && room.players.length >= 2,
         },
     infoMessage: room.infoMessage ?? '',
@@ -366,10 +387,31 @@ const emitRoomState = (room) => {
   for (const player of room.players) {
     io.to(player.id).emit('roomState', buildStateForPlayer(room, player.id))
   }
+
+  for (const spectator of room.spectators || []) {
+    io.to(spectator.id).emit('roomState', buildStateForPlayer(room, spectator.id))
+  }
 }
 
 const emitError = (socket, message) => {
   socket.emit('errorMessage', message)
+}
+
+const promoteWaitingSpectators = (room) => {
+  room.spectators = room.spectators || []
+  const promoted = []
+
+  while (room.players.length < 4 && room.spectators.length > 0) {
+    const nextSpectator = room.spectators.shift()
+    room.players.push(nextSpectator)
+    promoted.push(nextSpectator.name)
+
+    if (!Object.prototype.hasOwnProperty.call(room.money, nextSpectator.id)) {
+      room.money[nextSpectator.id] = 0
+    }
+  }
+
+  return promoted
 }
 
 const clearAutoStartTimer = (room) => {
@@ -568,6 +610,7 @@ io.on('connection', (socket) => {
       code,
       ownerId: socket.id,
       players: [{ id: socket.id, userId: player.userId, name: player.userName }],
+      spectators: [],
       betUnit: parsedBet,
       money: { [socket.id]: dbUser.balance || 0 },
       moneyEvents: [`Mức cược phòng: ${parsedBet}/lá`],
@@ -602,17 +645,8 @@ io.on('connection', (socket) => {
       return
     }
 
-    if (room.players.length >= 4) {
-      emitError(socket, 'Phòng đã đủ 4 người chơi.')
-      return
-    }
-
-    if (room.game?.started) {
-      emitError(socket, 'Ván đã bắt đầu, không thể vào thêm.')
-      return
-    }
-
-    if (room.players.some((existingPlayer) => existingPlayer.userId === player.userId)) {
+    const existingParticipant = findParticipantByUserId(room, player.userId)
+    if (existingParticipant) {
       emitError(socket, 'Tài khoản này đã có trong phòng.')
       return
     }
@@ -632,9 +666,22 @@ io.on('connection', (socket) => {
       return
     }
 
-    room.players.push({ id: socket.id, userId: player.userId, name: player.userName })
     room.money[socket.id] = room.money[socket.id] || dbUser.balance || 0
-    room.infoMessage = `${player.userName} đã vào phòng.`
+
+    if (room.game?.started) {
+      room.spectators = room.spectators || []
+      room.spectators.push({ id: socket.id, userId: player.userId, name: player.userName })
+      room.infoMessage = `${player.userName} đang xem ván hiện tại.`
+    } else {
+      if (room.players.length >= 4) {
+        emitError(socket, 'Phòng đã đủ 4 người chơi.')
+        return
+      }
+
+      room.players.push({ id: socket.id, userId: player.userId, name: player.userName })
+      room.infoMessage = `${player.userName} đã vào phòng.`
+    }
+
     socket.join(normalizedCode)
     socket.emit('joinedRoom', { roomCode: normalizedCode, playerId: socket.id })
     emitRoomState(room)
@@ -729,7 +776,11 @@ io.on('connection', (socket) => {
       game.winnerId = socket.id
       room.previousWinnerId = socket.id
       settleEndGameMoney(room, socket.id)
+      const promotedNames = promoteWaitingSpectators(room)
       room.infoMessage = `${currentPlayer.name} đã thắng ván này!`
+      if (promotedNames.length > 0) {
+        room.infoMessage += ` ${promotedNames.join(', ')} sẽ vào vai người chơi ở ván kế tiếp.`
+      }
       emitRoomState(room)
       scheduleAutoStartNextRound(room)
       return
@@ -779,6 +830,7 @@ io.on('connection', (socket) => {
     }
 
     room.players = room.players.filter((player) => player.id !== socket.id)
+    room.spectators = (room.spectators || []).filter((spectator) => spectator.id !== socket.id)
 
     if (room.ownerId === socket.id && room.players.length > 0) {
       room.ownerId = room.players[0].id
@@ -802,11 +854,13 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     for (const [code, room] of rooms.entries()) {
       const existed = room.players.some((player) => player.id === socket.id)
-      if (!existed) {
+      const spectatorExisted = (room.spectators || []).some((spectator) => spectator.id === socket.id)
+      if (!existed && !spectatorExisted) {
         continue
       }
 
       room.players = room.players.filter((player) => player.id !== socket.id)
+      room.spectators = (room.spectators || []).filter((spectator) => spectator.id !== socket.id)
 
       if (room.players.length === 0) {
         clearAutoStartTimer(room)

@@ -77,6 +77,13 @@ function App() {
     return roomState?.players?.find((player) => player.id === id) ?? null
   }, [roomState])
 
+  const meSpectator = useMemo(() => {
+    const id = socketRef.current?.id
+    return roomState?.spectators?.find((spectator) => spectator.id === id) ?? null
+  }, [roomState])
+
+  const isSpectator = Boolean(roomState?.game?.isSpectator)
+
   const isMyTurn = useMemo(() => {
     return roomState?.game?.turnPlayerId === socketRef.current?.id
   }, [roomState])
@@ -184,7 +191,8 @@ function App() {
             {roomState.players.find((p) => p.id === roomState.ownerId)?.name ?? '-'}
           </div>
           <div>
-            <strong>Bạn:</strong> {me?.name ?? '-'}
+            <strong>Bạn:</strong> {me?.name ?? meSpectator?.name ?? '-'}
+            {isSpectator ? ' (Người xem)' : ''}
           </div>
           <div>
             <strong>Đến lượt:</strong>{' '}
@@ -204,10 +212,20 @@ function App() {
           ))}
         </ul>
 
+        {roomState.spectators?.length > 0 && (
+          <p className="info">
+            Người xem: {roomState.spectators.map((spectator) => spectator.name).join(', ')}
+          </p>
+        )}
+
+        {isSpectator && (
+          <p className="info">Bạn đang ở chế độ người xem. Bạn chỉ xem diễn biến ván hiện tại.</p>
+        )}
+
         {roomState.infoMessage && <p className="info">{roomState.infoMessage}</p>}
         {errorMessage && <p className="error">{errorMessage}</p>}
 
-        {!roomState.game.started && (
+        {!roomState.game.started && !isSpectator && (
           <div className="actions">
             <button onClick={startGame} disabled={!roomState.game.canStart}>
               Bắt đầu ván
@@ -225,33 +243,37 @@ function App() {
               </p>
             )}
 
-            <h3>Bài của bạn ({roomState.game.myHand.length} lá)</h3>
-            <div className="hand">
-              {roomState.game.myHand.map((card) => (
-                <button
-                  key={card}
-                  className={`card ${selectedCards.includes(card) ? 'selected' : ''}`}
-                  onClick={() => toggleCard(card)}
-                >
-                  {cardLabel(card)}
-                </button>
-              ))}
-            </div>
+            {!isSpectator && (
+              <>
+                <h3>Bài của bạn ({roomState.game.myHand.length} lá)</h3>
+                <div className="hand">
+                  {roomState.game.myHand.map((card) => (
+                    <button
+                      key={card}
+                      className={`card ${selectedCards.includes(card) ? 'selected' : ''}`}
+                      onClick={() => toggleCard(card)}
+                    >
+                      {cardLabel(card)}
+                    </button>
+                  ))}
+                </div>
 
-            <div className="actions">
-              <button onClick={playCards} disabled={!isMyTurn || selectedCards.length === 0}>
-                Đánh bài
-              </button>
-              <button
-                onClick={passTurn}
-                disabled={!isMyTurn || !roomState.game.currentTrick || isCurrentTrickMine}
-              >
-                Bỏ lượt
-              </button>
-              <button className="ghost" onClick={() => setSelectedCards([])}>
-                Bỏ chọn
-              </button>
-            </div>
+                <div className="actions">
+                  <button onClick={playCards} disabled={!isMyTurn || selectedCards.length === 0}>
+                    Đánh bài
+                  </button>
+                  <button
+                    onClick={passTurn}
+                    disabled={!isMyTurn || !roomState.game.currentTrick || isCurrentTrickMine}
+                  >
+                    Bỏ lượt
+                  </button>
+                  <button className="ghost" onClick={() => setSelectedCards([])}>
+                    Bỏ chọn
+                  </button>
+                </div>
+              </>
+            )}
           </>
         )}
 

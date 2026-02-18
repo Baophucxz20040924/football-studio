@@ -9,6 +9,7 @@ const Bet = require("./models/Bet");
 const User = require("./models/User");
 const AviatorBet = require("./models/AviatorBet");
 const AviatorRound = require("./models/AviatorRound");
+const ChatMessage = require("./models/ChatMessage");
 const { verifyAviatorToken } = require("./aviator/token");
 const { handleInteraction, getCommandData } = require("./discord/commands");
 
@@ -20,6 +21,7 @@ const AVIATOR_TICK_MS = 100;
 const AVIATOR_K = 0.12;
 const AVIATOR_HOUSE_EDGE = Number(process.env.AVIATOR_HOUSE_EDGE || 0.01);
 const TIENLEN_DIST_DIR = path.join(__dirname, "tienlen", "server", "client", "dist");
+const CHAT_PUBLIC_DIR = path.join(__dirname, "chat", "public");
 
 const aviatorState = {
   status: "WAITING",
@@ -57,11 +59,36 @@ async function pruneOldMatches() {
   await Match.deleteMany({ _id: { $in: staleIds } });
 }
 
+async function pruneChatMessages() {
+  const total = await ChatMessage.countDocuments({});
+  if (total <= 300) {
+    return;
+  }
+
+  const stale = await ChatMessage.find({})
+    .sort({ createdAt: 1 })
+    .limit(total - 300)
+    .select("_id");
+
+  if (stale.length) {
+    await ChatMessage.deleteMany({ _id: { $in: stale.map((item) => item._id) } });
+  }
+}
+
+function getClientIp(req) {
+  const forwarded = req.headers["x-forwarded-for"];
+  if (typeof forwarded === "string" && forwarded.trim()) {
+    return forwarded.split(",")[0].trim();
+  }
+  return req.ip || "";
+}
+
 app.use(express.json());
 app.use("/admin", express.static(path.join(__dirname, "admin", "public")));
 app.use("/aviator/assets", express.static(path.join(__dirname, "aviator", "public")));
 app.use("/tienlen/assets", express.static(path.join(TIENLEN_DIST_DIR, "assets")));
 app.use("/assets", express.static(path.join(TIENLEN_DIST_DIR, "assets")));
+app.use("/chat/assets", express.static(CHAT_PUBLIC_DIR));
 
 app.get("/aviator", (req, res) => {
   res.sendFile(path.join(__dirname, "aviator", "public", "aviator.html"));
@@ -77,8 +104,55 @@ app.get("/tienlen", (req, res) => {
   });
 });
 
+app.get("/chat", (req, res) => {
+  res.sendFile(path.join(CHAT_PUBLIC_DIR, "chat.html"));
+});
+
 app.get("/api/health", (req, res) => {
   res.json({ ok: true });
+});
+
+app.get("/api/chat/messages", async (req, res) => {
+  const messages = await ChatMessage.find({})
+    .sort({ createdAt: -1 })
+    .limit(100)
+    .lean();
+
+  messages.reverse();
+  res.json(messages.map((item) => ({
+    id: String(item._id),
+    name: item.name,
+    text: item.text,
+    createdAt: item.createdAt
+  })));
+});
+
+app.post("/api/chat/messages", async (req, res) => {
+  const name = typeof req.body.name === "string" ? req.body.name.trim() : "";
+  const text = typeof req.body.text === "string" ? req.body.text.trim() : "";
+
+  if (!name || !text) {
+    return res.status(400).json({ error: "name and text are required" });
+  }
+
+  if (name.length > 50 || text.length > 500) {
+    return res.status(400).json({ error: "name or text is too long" });
+  }
+
+  const message = await ChatMessage.create({
+    name,
+    text,
+    ip: getClientIp(req)
+  });
+
+  await pruneChatMessages();
+
+  res.status(201).json({
+    id: String(message._id),
+    name: message.name,
+    text: message.text,
+    createdAt: message.createdAt
+  });
 });
 
 function getTokenFromRequest(req) {

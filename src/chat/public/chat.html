@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chat công khai</title>
+    <link rel="stylesheet" href="/chat/assets/chat.css" />
+  </head>
+  <body>
+    <main class="chat-page">
+      <h1>Phòng chat công khai</h1>
+
+      <form id="chat-form" class="chat-form" autocomplete="off">
+        <input id="name" name="name" type="text" maxlength="50" placeholder="Nhập tên của bạn" required />
+        <textarea id="message" name="message" maxlength="500" placeholder="Nhập tin nhắn..." required></textarea>
+        <button type="submit">Gửi</button>
+      </form>
+
+      <section>
+        <h2>Tin nhắn mới nhất</h2>
+        <div id="messages" class="messages"></div>
+      </section>
+    </main>
+
+    <script src="/chat/assets/chat.js"></script>
+  </body>
+</html>

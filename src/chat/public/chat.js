@@ -2,8 +2,10 @@ const form = document.getElementById("chat-form");
 const nameInput = document.getElementById("name");
 const messageInput = document.getElementById("message");
 const messagesEl = document.getElementById("messages");
+const submitButton = form.querySelector("button[type='submit']");
 
 const NAME_STORAGE_KEY = "public_chat_name";
+let isSending = false;
 
 function escapeHtml(text) {
   return text
@@ -22,9 +24,16 @@ function formatTime(value) {
   return date.toLocaleString("vi-VN");
 }
 
-function renderMessages(messages) {
+function isNearBottom() {
+  return messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 80;
+}
+
+function renderMessages(messages, forceBottom = false) {
+  const shouldStickToBottom = forceBottom || isNearBottom();
+  const activeName = nameInput.value.trim().toLowerCase();
+
   if (!Array.isArray(messages) || messages.length === 0) {
-    messagesEl.innerHTML = "<div class=\"message-item\">Chưa có tin nhắn nào.</div>";
+    messagesEl.innerHTML = "<div class=\"empty\">Chưa có tin nhắn nào.</div>";
     return;
   }
 
@@ -33,8 +42,9 @@ function renderMessages(messages) {
       const name = escapeHtml(item.name || "Ẩn danh");
       const text = escapeHtml(item.text || "");
       const createdAt = formatTime(item.createdAt);
+      const mine = activeName && (item.name || "").trim().toLowerCase() === activeName;
       return `
-        <article class="message-item">
+        <article class="message-item${mine ? " mine" : ""}">
           <div class="message-meta"><strong>${name}</strong> • ${createdAt}</div>
           <div class="message-text">${text}</div>
         </article>
@@ -42,19 +52,21 @@ function renderMessages(messages) {
     })
     .join("");
 
-  messagesEl.scrollTop = messagesEl.scrollHeight;
+  if (shouldStickToBottom) {
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
 }
 
-async function loadMessages() {
+async function loadMessages(forceBottom = false) {
   try {
     const response = await fetch("/api/chat/messages");
     if (!response.ok) {
       throw new Error("Không tải được tin nhắn");
     }
     const messages = await response.json();
-    renderMessages(messages);
+    renderMessages(messages, forceBottom);
   } catch (error) {
-    messagesEl.innerHTML = `<div class="message-item">${escapeHtml(error.message)}</div>`;
+    messagesEl.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`;
   }
 }
 
@@ -63,11 +75,14 @@ form.addEventListener("submit", async (event) => {
 
   const name = nameInput.value.trim();
   const text = messageInput.value.trim();
-  if (!name || !text) {
+  if (!name || !text || isSending) {
     return;
   }
 
   try {
+    isSending = true;
+    submitButton.disabled = true;
+
     const response = await fetch("/api/chat/messages", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -81,10 +96,27 @@ form.addEventListener("submit", async (event) => {
 
     localStorage.setItem(NAME_STORAGE_KEY, name);
     messageInput.value = "";
-    await loadMessages();
+    messageInput.style.height = "";
+    await loadMessages(true);
+    messageInput.focus();
   } catch (error) {
     alert(error.message);
+  } finally {
+    isSending = false;
+    submitButton.disabled = false;
   }
+});
+
+messageInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && !event.shiftKey) {
+    event.preventDefault();
+    form.requestSubmit();
+  }
+});
+
+messageInput.addEventListener("input", () => {
+  messageInput.style.height = "auto";
+  messageInput.style.height = `${Math.min(messageInput.scrollHeight, 150)}px`;
 });
 
 function init() {
@@ -93,7 +125,7 @@ function init() {
     nameInput.value = savedName;
   }
 
-  void loadMessages();
+  void loadMessages(true);
   setInterval(loadMessages, 2500);
 }
 

@@ -8,18 +8,22 @@
   </head>
   <body>
     <main class="chat-page">
-      <h1>Phòng chat công khai</h1>
+      <header class="chat-header">
+        <h1>Public Chat</h1>
+        <p>Ai cũng có thể vào nhắn tin.</p>
+      </header>
+
+      <section id="messages" class="messages" aria-live="polite"></section>
 
       <form id="chat-form" class="chat-form" autocomplete="off">
-        <input id="name" name="name" type="text" maxlength="50" placeholder="Nhập tên của bạn" required />
-        <textarea id="message" name="message" maxlength="500" placeholder="Nhập tin nhắn..." required></textarea>
-        <button type="submit">Gửi</button>
+        <div class="composer-top">
+          <input id="name" name="name" type="text" maxlength="50" placeholder="Tên hiển thị" required />
+        </div>
+        <div class="composer-row">
+          <textarea id="message" name="message" maxlength="500" placeholder="Nhập tin nhắn... (Enter để gửi, Shift+Enter xuống dòng)" required></textarea>
+          <button type="submit">Gửi</button>
+        </div>
       </form>
-
-      <section>
-        <h2>Tin nhắn mới nhất</h2>
-        <div id="messages" class="messages"></div>
-      </section>
     </main>
 
     <script src="/chat/assets/chat.js"></script>

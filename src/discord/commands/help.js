@@ -15,6 +15,7 @@ module.exports = {
       "\ud83d\udd34 **/live** - Xem trận đang live",
       "\ud83e\udd1d **/give** - Chuyển điểm cho người khác",
       "\ud83c\udf89 **/daily** - Điểm danh nhận điểm thưởng hàng ngày",
+      "\ud83d\udcbc **/work** - Đi làm mỗi 5 phút nhận ngẫu nhiên 50-300 điểm",
       "",
       "**Trò chơi casino**",
       "\u26bd **/football** - Football Studio (Home/Away/Draw)",

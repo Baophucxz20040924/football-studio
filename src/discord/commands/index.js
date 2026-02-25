@@ -14,7 +14,8 @@ const commands = [
   require("./tx"),
   require("./helpfootball"),
   require("./helpbcr"),
-  require("./daily")
+  require("./daily"),
+  require("./work")
 ];
 
 function getCommandData() {

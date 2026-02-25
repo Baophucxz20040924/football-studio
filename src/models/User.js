@@ -7,6 +7,7 @@ const UserSchema = new mongoose.Schema(
     balance: { type: Number, default: 0 },
     lastSeen: { type: Date, default: null },
     lastDailyClaimDate: { type: Date, default: null },
+    lastWorkClaimAt: { type: Date, default: null },
     consecutiveDays: { type: Number, default: 0 }
   },
   { timestamps: true }

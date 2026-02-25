@@ -20,58 +20,68 @@ module.exports = {
     const matchRef = interaction.options.getString("match_code", true).trim();
     const pickKey = interaction.options.getString("pick_key", true).trim();
     const amount = normalizeAmount(interaction.options.getInteger("amount", true));
+    const now = new Date();
 
     if (!amount) {
       const embed = buildEmbed({
         title: "Invalid amount ❌",
-        description: "Please enter a positive number. \ud83d\udcb8",
+        description: "Please enter a positive number. 💸",
         color: 0xf36c5c
       });
       return interaction.reply({ embeds: [embed], ephemeral: true });
     }
 
     let match = null;
+    const openBettingQuery = {
+      status: "open",
+      betLocked: { $ne: true },
+      kickoff: { $gt: now }
+    };
+
     if (/^\d{1,6}$/.test(matchRef)) {
-      match = await Match.findOne({ matchCode: Number(matchRef) });
+      match = await Match.findOne({ matchCode: Number(matchRef), ...openBettingQuery });
     } else if (/^[a-f0-9]{24}$/i.test(matchRef)) {
-      match = await Match.findById(matchRef);
+      match = await Match.findOne({ _id: matchRef, ...openBettingQuery });
     }
-    if (!match || match.status !== "open") {
+
+    if (!match) {
+      let existingMatch = null;
+      if (/^\d{1,6}$/.test(matchRef)) {
+        existingMatch = await Match.findOne({ matchCode: Number(matchRef) });
+      } else if (/^[a-f0-9]{24}$/i.test(matchRef)) {
+        existingMatch = await Match.findById(matchRef);
+      }
+
+      if (existingMatch && existingMatch.status === "open") {
+        const kickoffTime = new Date(existingMatch.kickoff).getTime();
+        if (existingMatch.betLocked || (Number.isFinite(kickoffTime) && kickoffTime <= Date.now())) {
+          if (!existingMatch.betLocked) {
+            existingMatch.betLocked = true;
+            await existingMatch.save();
+          }
+
+          const embed = buildEmbed({
+            title: "Betting is locked 🔒",
+            description: "Match has reached kickoff time, betting is now closed. ⏰",
+            color: 0xf36c5c
+          });
+          return interaction.reply({ embeds: [embed], ephemeral: true });
+        }
+      }
+
       const embed = buildEmbed({
         title: "Match not found 🗓️",
-        description: "This match is closed or does not exist. \ud83d\uddd3\ufe0f",
+        description: "This match is closed or does not exist. 🗓️",
         color: 0xf36c5c
       });
       return interaction.reply({ embeds: [embed], ephemeral: true });
     }
-
-    if (match.betLocked) {
-      const embed = buildEmbed({
-        title: "Betting is locked 🔒",
-        description: "This match is temporarily locked for betting. \ud83d\udd12",
-        color: 0xf36c5c
-      });
-      return interaction.reply({ embeds: [embed], ephemeral: true });
-    }
-
-      const kickoffTime = match.kickoff ? new Date(match.kickoff).getTime() : 0;
-      if (kickoffTime && kickoffTime <= Date.now()) {
-        match.betLocked = true;
-        await match.save();
-
-        const embed = buildEmbed({
-          title: "Betting is locked 🔒",
-          description: "Match has reached kickoff time, betting is now closed. ⏰",
-          color: 0xf36c5c
-        });
-        return interaction.reply({ embeds: [embed], ephemeral: true });
-      }
 
     const odd = match.odds.find((o) => o.key === pickKey);
     if (!odd) {
       const embed = buildEmbed({
         title: "Invalid pick ❗",
-        description: `Available odds: ${formatOdds(match.odds)} \u26bd`,
+        description: `Available odds: ${formatOdds(match.odds)} ⚽`,
         color: 0xf36c5c
       });
       return interaction.reply({ embeds: [embed], ephemeral: true });
@@ -82,7 +92,7 @@ module.exports = {
     if (user.balance < amount) {
       const embed = buildEmbed({
         title: "Not enough balance 💸",
-        description: `Current balance: ${formatPoints(user.balance)} \ud83d\udcb5`,
+        description: `Current balance: ${formatPoints(user.balance)} 💵`,
         color: 0xf36c5c
       });
       return interaction.reply({ embeds: [embed], ephemeral: true });
@@ -100,7 +110,7 @@ module.exports = {
     });
 
     const embed = buildEmbed({
-      title: "Bet placed \u26bd",
+      title: "Bet placed ⚽",
       description: [
         `Match: **${match.homeTeam} vs ${match.awayTeam}**`,
         `Pick: **${pickKey}** (x${odd.multiplier})`,

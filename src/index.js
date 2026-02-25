@@ -739,6 +739,11 @@ app.post("/api/matches", async (req, res) => {
     return res.status(400).json({ error: "Invalid payload" });
   }
 
+  const kickoffDate = new Date(kickoff);
+  if (Number.isNaN(kickoffDate.getTime())) {
+    return res.status(400).json({ error: "Invalid kickoff" });
+  }
+
   const matchCode = await generateMatchCode();
 
   const match = await Match.create({
@@ -746,7 +751,7 @@ app.post("/api/matches", async (req, res) => {
     homeTeam,
     awayTeam,
     stadium: stadium || "",
-    kickoff: new Date(kickoff),
+    kickoff: kickoffDate,
     odds,
     status: "open"
   });
@@ -767,9 +772,20 @@ app.put("/api/matches/:id", async (req, res) => {
     return res.status(400).json({ error: "Match already closed" });
   }
 
+  if (updates.kickoff !== undefined) {
+    const kickoffDate = new Date(updates.kickoff);
+    if (Number.isNaN(kickoffDate.getTime())) {
+      return res.status(400).json({ error: "Invalid kickoff" });
+    }
+  }
+
   const allowed = ["homeTeam", "awayTeam", "stadium", "kickoff", "odds"];
   allowed.forEach((key) => {
     if (updates[key] !== undefined) {
+      if (key === "kickoff") {
+        match[key] = new Date(updates[key]);
+        return;
+      }
       match[key] = updates[key];
     }
   });

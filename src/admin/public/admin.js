@@ -17,6 +17,19 @@ async function fetchUsers() {
   renderUsers(users);
 }
 
+function toKickoffIso(value) {
+  if (typeof value !== "string" || !value.trim()) {
+    return "";
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return "";
+  }
+
+  return parsed.toISOString();
+}
+
 function setupTabs() {
   const tabButtons = Array.from(document.querySelectorAll(".tab-btn"));
   const pages = Array.from(document.querySelectorAll(".tab-page"));
@@ -554,7 +567,7 @@ form.addEventListener("submit", async (event) => {
     homeTeam: formData.get("homeTeam"),
     awayTeam: formData.get("awayTeam"),
     stadium: formData.get("stadium"),
-    kickoff: formData.get("kickoff"),
+    kickoff: toKickoffIso(formData.get("kickoff")),
     odds: parseOdds(formData.get("odds"))
   };
 

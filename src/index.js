@@ -18,6 +18,7 @@ const PORT = Number(process.env.PORT || 3000);
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/football_bot";
 const STARTING_BALANCE = Number(process.env.STARTING_BALANCE || 0);
 const MATCH_AUTO_LOCK_INTERVAL_MS = Number(process.env.MATCH_AUTO_LOCK_INTERVAL_MS || 30_000);
+const KICKOFF_UTC_OFFSET_MINUTES = Number(process.env.KICKOFF_UTC_OFFSET_MINUTES || 420);
 const AVIATOR_TICK_MS = 100;
 const AVIATOR_K = 0.12;
 const AVIATOR_HOUSE_EDGE = Number(process.env.AVIATOR_HOUSE_EDGE || 0.01);
@@ -39,6 +40,44 @@ const aviatorClients = new Map();
 const aviatorOpenBets = new Map();
 let aviatorRoundBets = [];
 let matchAutoLockIntervalId = null;
+
+function parseKickoffInput(value) {
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const localLike = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?$/);
+  const hasTimezone = /[zZ]|[+-]\d{2}:\d{2}$/.test(trimmed);
+
+  if (localLike && !hasTimezone) {
+    const [, year, month, day, hour, minute, second = "0"] = localLike;
+    const utcMs = Date.UTC(
+      Number(year),
+      Number(month) - 1,
+      Number(day),
+      Number(hour),
+      Number(minute),
+      Number(second)
+    ) - (KICKOFF_UTC_OFFSET_MINUTES * 60 * 1000);
+    return new Date(utcMs);
+  }
+
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return parsed;
+}
 
 async function lockMatchesAtKickoff() {
   const now = new Date();
@@ -739,8 +778,8 @@ app.post("/api/matches", async (req, res) => {
     return res.status(400).json({ error: "Invalid payload" });
   }
 
-  const kickoffDate = new Date(kickoff);
-  if (Number.isNaN(kickoffDate.getTime())) {
+  const kickoffDate = parseKickoffInput(kickoff);
+  if (!kickoffDate) {
     return res.status(400).json({ error: "Invalid kickoff" });
   }
 
@@ -773,8 +812,8 @@ app.put("/api/matches/:id", async (req, res) => {
   }
 
   if (updates.kickoff !== undefined) {
-    const kickoffDate = new Date(updates.kickoff);
-    if (Number.isNaN(kickoffDate.getTime())) {
+    const kickoffDate = parseKickoffInput(updates.kickoff);
+    if (!kickoffDate) {
       return res.status(400).json({ error: "Invalid kickoff" });
     }
   }
@@ -783,7 +822,7 @@ app.put("/api/matches/:id", async (req, res) => {
   allowed.forEach((key) => {
     if (updates[key] !== undefined) {
       if (key === "kickoff") {
-        match[key] = new Date(updates[key]);
+        match[key] = parseKickoffInput(updates[key]);
         return;
       }
       match[key] = updates[key];

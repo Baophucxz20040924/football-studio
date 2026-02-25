@@ -98,6 +98,31 @@ module.exports = {
       return interaction.reply({ embeds: [embed], ephemeral: true });
     }
 
+    const lockCheck = await Match.findOne({
+      _id: match._id,
+      status: "open",
+      betLocked: { $ne: true },
+      kickoff: { $gt: new Date() }
+    }).select("_id");
+
+    if (!lockCheck) {
+      const latest = await Match.findById(match._id).select("betLocked kickoff status");
+      if (latest && latest.status === "open" && !latest.betLocked) {
+        const kickoffTime = new Date(latest.kickoff).getTime();
+        if (Number.isFinite(kickoffTime) && kickoffTime <= Date.now()) {
+          latest.betLocked = true;
+          await latest.save();
+        }
+      }
+
+      const embed = buildEmbed({
+        title: "Betting is locked 🔒",
+        description: "Match has reached kickoff time, betting is now closed. ⏰",
+        color: 0xf36c5c
+      });
+      return interaction.reply({ embeds: [embed], ephemeral: true });
+    }
+
     user.balance -= amount;
     await user.save();
 

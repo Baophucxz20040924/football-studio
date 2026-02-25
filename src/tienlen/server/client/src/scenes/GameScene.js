@@ -29,6 +29,7 @@ export class GameScene extends Phaser.Scene {
     this.countTexts = {}
     this.turnRings = {}
     this.backStacks = {}
+    this.robStarterPromptSent = false
   }
 
   create() {
@@ -276,6 +277,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   applySyncState(state) {
+    const wasStarted = this.started
+
     if (state.roomId) {
       this.roomCodeText.setText(`Phòng: ${state.roomId}`)
     }
@@ -286,7 +289,6 @@ export class GameScene extends Phaser.Scene {
     }
 
     const latestMoneyEvent = (state.moneyEvents || [])[state.moneyEvents.length - 1]
-    this.moneyEventText.setText(latestMoneyEvent ? `Tiền: ${latestMoneyEvent}` : '')
 
     this.mySeat = state.mySeat >= 0 ? state.mySeat : this.mySeat
     this.playersBySeat = {}
@@ -303,13 +305,49 @@ export class GameScene extends Phaser.Scene {
     this.canStart = !!state.canStart
     this.started = !!state.started
 
+    if (this.started && !wasStarted) {
+      this.robStarterPromptSent = false
+    }
+    if (!this.started) {
+      this.robStarterPromptSent = false
+    }
+
     const myCards = state.hands?.[this.mySeat] || []
     this.hand.setCards(myCards, this.started && this.currentTurn === this.mySeat)
 
     this.table.setTableCards(this.tableState.cards || [], comboLabelMap[this.tableState.combo] || this.tableState.combo)
     this.infoText.setText(state.info || '')
+
+    if (!this.started && state.roundResult) {
+      const winnerName = state.roundResult.winnerName || 'Người thắng'
+      const lines = ['KẾT QUẢ VÁN', '', `${winnerName} thắng`, '']
+      const transfers = Array.isArray(state.roundResult.transfers) ? state.roundResult.transfers : []
+
+      if (transfers.length > 0) {
+        transfers.forEach((tx) => {
+          lines.push(`${tx.fromName} → ${tx.toName} : ${tx.units} lá`)
+        })
+      } else {
+        lines.push('Không có giao dịch tiền trong ván này')
+      }
+
+      lines.push('')
+      lines.push(`Tổng ${winnerName} nhận: ${state.roundResult.totalUnits || 0} lá (${state.roundResult.totalAmount || 0} điểm)`)
+      this.moneyEventText.setText(lines.join('\n'))
+    } else {
+      this.moneyEventText.setText(latestMoneyEvent ? `Tiền: ${latestMoneyEvent}` : '')
+    }
+
     this.refreshSeatUI(state.handsCount || {})
     this.refreshControlState()
+
+    if (this.started && state.canRobStarter && !this.robStarterPromptSent) {
+      this.robStarterPromptSent = true
+      this.time.delayedCall(50, () => {
+        const shouldRob = window.confirm('Bạn có 3 đôi thông. Bạn có muốn cướp cái không?')
+        socketEvents.starterDecision(shouldRob ? 'claim' : 'skip')
+      })
+    }
   }
 
   refreshSeatUI(handsCount = {}) {

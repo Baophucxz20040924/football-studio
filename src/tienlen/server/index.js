@@ -137,6 +137,51 @@ const nextIndex = (players, currentIndex) => {
 
 const rankPowerOf = (rank) => parseCard(`${rank}S`).rankPower
 
+const findThreeConsecutivePairsCards = (hand) => {
+  if (!Array.isArray(hand) || hand.length < 6) {
+    return null
+  }
+
+  const groups = new Map()
+  for (const rawCard of sortCards(hand)) {
+    const card = parseCard(rawCard)
+    if (!groups.has(card.rankPower)) {
+      groups.set(card.rankPower, [])
+    }
+    groups.get(card.rankPower).push(rawCard)
+  }
+
+  const twoRank = rankPowerOf('2')
+  let runStart = null
+  let runLength = 0
+
+  for (let rank = 0; rank < twoRank; rank += 1) {
+    const cards = groups.get(rank) || []
+    if (cards.length >= 2) {
+      if (runStart === null) {
+        runStart = rank
+      }
+      runLength += 1
+      if (runLength >= 3) {
+        const chosen = []
+        for (let takeRank = rank - 2; takeRank <= rank; takeRank += 1) {
+          const pairCards = (groups.get(takeRank) || []).slice(0, 2)
+          if (pairCards.length < 2) {
+            return null
+          }
+          chosen.push(...pairCards)
+        }
+        return sortCards(chosen)
+      }
+    } else {
+      runStart = null
+      runLength = 0
+    }
+  }
+
+  return null
+}
+
 const findThreeSpadesHolderId = (room, hands) => {
   return room.players.find((player) => (hands[player.id] || []).includes('3S'))?.id ?? null
 }
@@ -270,6 +315,14 @@ const getThoiExtraUnits = (hand) => {
 
 const settleEndGameMoney = (room, winnerId) => {
   const game = room.game
+  const winner = room.players.find((player) => player.id === winnerId)
+  const roundResult = {
+    winnerId,
+    winnerName: winner?.name || 'Người thắng',
+    transfers: [],
+    totalUnits: 0,
+    totalAmount: 0,
+  }
 
   for (const player of room.players) {
     if (player.id === winnerId) {
@@ -283,10 +336,30 @@ const settleEndGameMoney = (room, winnerId) => {
     const totalUnits = baseUnits + extraUnits
 
     const reason = isCong ? 'Cóng' : `${hand.length} lá còn lại`
-    transferMoney(room, player.id, winnerId, totalUnits, `${reason}${extraUnits > 0 ? ` + thối lá ${extraUnits}` : ''}`)
+    const amount = transferMoney(
+      room,
+      player.id,
+      winnerId,
+      totalUnits,
+      `${reason}${extraUnits > 0 ? ` + thối lá ${extraUnits}` : ''}`,
+    )
+
+    if (amount > 0) {
+      roundResult.transfers.push({
+        fromId: player.id,
+        fromName: player.name,
+        toId: winnerId,
+        toName: roundResult.winnerName,
+        units: totalUnits,
+        amount,
+      })
+      roundResult.totalUnits += totalUnits
+      roundResult.totalAmount += amount
+    }
   }
 
   settlePendingLeavePenalties(room, winnerId)
+  room.lastRoundResult = roundResult
 }
 
 const getLeavePenaltyUnits = (hand) => {
@@ -417,6 +490,13 @@ const buildStateForPlayer = (room, playerId) => {
   const game = room.game
   const myHand = game?.hands?.[playerId] ?? []
   const isSpectator = !room.players.some((player) => player.id === playerId)
+  const canRobStarter =
+    !!game?.started &&
+    !game?.currentTrick &&
+    !!game?.starterRobbery &&
+    !game.starterRobbery.resolved &&
+    game.starterRobbery.eligibleIds.has(playerId) &&
+    !game.starterRobbery.declinedIds.has(playerId)
 
   return {
     roomCode: room.code,
@@ -440,7 +520,9 @@ const buildStateForPlayer = (room, playerId) => {
           turnPlayerId: room.players[game.turnIndex]?.id ?? null,
           currentTrick: game.currentTrick,
           winnerId: game.winnerId,
+          roundResult: !game.started ? room.lastRoundResult ?? null : null,
           firstTurnPending: game.firstTurnPending,
+          canRobStarter,
           myHand,
           isSpectator,
           canStart: room.ownerId === playerId && room.players.length >= 2,
@@ -450,7 +532,9 @@ const buildStateForPlayer = (room, playerId) => {
           turnPlayerId: null,
           currentTrick: null,
           winnerId: null,
+          roundResult: null,
           firstTurnPending: false,
+          canRobStarter: false,
           myHand: [],
           isSpectator,
           canStart: room.ownerId === playerId && room.players.length >= 2,
@@ -566,7 +650,19 @@ const setupGame = (room) => {
     firstTurnPending: !room.previousWinnerId && !!threeSpadesHolderId,
     chopState: null,
     pendingLeavePenalties: [],
+    starterRobbery: {
+      eligibleIds: new Set(
+        room.players
+          .filter((player) => player.id !== starterId)
+          .filter((player) => !!findThreeConsecutivePairsCards(hands[player.id] || []))
+          .map((player) => player.id),
+      ),
+      declinedIds: new Set(),
+      resolved: false,
+    },
   }
+
+  room.lastRoundResult = null
 
   room.infoMessage = room.previousWinnerId
     ? `${room.players.find((player) => player.id === starterId)?.name || 'Người thắng'} đi trước ván mới.`
@@ -612,11 +708,21 @@ const advanceTurnAfterPlay = (room) => {
   const game = room.game
   let idx = game.turnIndex
 
-  do {
+  while (true) {
     idx = nextIndex(room.players, idx)
-  } while (room.players[idx]?.id === game.currentTrick?.playerId && room.players.length > 1)
-
-  game.turnIndex = idx
+    const candidateId = room.players[idx]?.id
+    if (!candidateId) {
+      continue
+    }
+    if (candidateId === game.currentTrick?.playerId && room.players.length > 1) {
+      continue
+    }
+    if (game.passes.has(candidateId)) {
+      continue
+    }
+    game.turnIndex = idx
+    return
+  }
 }
 
 const advanceTurnAfterPass = (room) => {
@@ -777,6 +883,7 @@ io.on('connection', (socket) => {
       money: { [socket.id]: dbUser.balance || 0 },
       moneyEvents: [`Mức cược phòng: ${parsedBet}/lá`],
       game: null,
+      lastRoundResult: null,
       previousWinnerId: null,
       infoMessage: 'Tạo phòng thành công.',
     }
@@ -897,6 +1004,11 @@ io.on('connection', (socket) => {
       return
     }
 
+    if (game.currentTrick && game.passes.has(socket.id)) {
+      emitError(socket, 'Bạn đã bỏ lượt trong vòng này, chờ vòng mới để đánh tiếp.')
+      return
+    }
+
     if (game.firstTurnPending && !hand.includes('3S')) {
       game.firstTurnPending = false
       room.infoMessage = 'Bỏ ràng buộc 3♠ để tránh kẹt lượt đầu.'
@@ -930,8 +1042,11 @@ io.on('connection', (socket) => {
       cards: sortCards(cards),
       combo,
     }
-    game.passes = new Set()
+    game.passes = new Set([...game.passes].filter((id) => id !== socket.id))
     game.firstTurnPending = false
+    if (game.starterRobbery && !game.starterRobbery.resolved) {
+      game.starterRobbery.resolved = true
+    }
 
     if (game.hands[socket.id].length === 0) {
       game.started = false
@@ -949,6 +1064,99 @@ io.on('connection', (socket) => {
     }
 
     room.infoMessage = `${currentPlayer.name} đã đánh ${cards.length} lá.`
+    advanceTurnAfterPlay(room)
+    emitRoomState(room)
+  })
+
+  socket.on('starterDecision', ({ roomCode, action }) => {
+    const room = rooms.get((roomCode || '').trim().toUpperCase())
+    if (!room || !room.game?.started) {
+      emitError(socket, 'Ván chơi chưa sẵn sàng.')
+      return
+    }
+
+    const game = room.game
+    const robbery = game.starterRobbery
+    if (!robbery || robbery.resolved) {
+      emitError(socket, 'Không còn quyền cướp cái ở thời điểm này.')
+      return
+    }
+
+    if (game.currentTrick) {
+      robbery.resolved = true
+      emitError(socket, 'Vòng đánh đã bắt đầu, không thể cướp cái.')
+      emitRoomState(room)
+      return
+    }
+
+    if (!robbery.eligibleIds.has(socket.id) || robbery.declinedIds.has(socket.id)) {
+      emitError(socket, 'Bạn không có quyền cướp cái.')
+      return
+    }
+
+    if (action !== 'claim' && action !== 'skip') {
+      emitError(socket, 'Lựa chọn cướp cái không hợp lệ.')
+      return
+    }
+
+    const currentPlayer = room.players.find((player) => player.id === socket.id)
+    if (!currentPlayer) {
+      emitError(socket, 'Không tìm thấy người chơi trong phòng.')
+      return
+    }
+
+    if (action === 'skip') {
+      robbery.declinedIds.add(socket.id)
+      const unresolved = [...robbery.eligibleIds].filter((id) => !robbery.declinedIds.has(id))
+      if (unresolved.length === 0) {
+        robbery.resolved = true
+      }
+      room.infoMessage = `${currentPlayer.name} chọn không cướp cái.`
+      emitRoomState(room)
+      return
+    }
+
+    const hand = game.hands[socket.id] || []
+    const robCards = findThreeConsecutivePairsCards(hand)
+    const combo = detectCombo(robCards || [])
+    if (!robCards || !combo || combo.type !== 'consecutivePairs' || combo.length !== 6) {
+      robbery.declinedIds.add(socket.id)
+      const unresolved = [...robbery.eligibleIds].filter((id) => !robbery.declinedIds.has(id))
+      if (unresolved.length === 0) {
+        robbery.resolved = true
+      }
+      emitError(socket, 'Không còn đủ 3 đôi thông để cướp cái.')
+      emitRoomState(room)
+      return
+    }
+
+    game.turnIndex = room.players.findIndex((player) => player.id === socket.id)
+    game.hands[socket.id] = removeCardsFromHand(hand, robCards)
+    game.currentTrick = {
+      playerId: socket.id,
+      cards: robCards,
+      combo,
+    }
+    game.passes = new Set()
+    game.firstTurnPending = false
+    robbery.resolved = true
+    room.infoMessage = `${currentPlayer.name} cướp cái bằng 3 đôi thông.`
+
+    if (game.hands[socket.id].length === 0) {
+      game.started = false
+      game.winnerId = socket.id
+      room.previousWinnerId = socket.id
+      settleEndGameMoney(room, socket.id)
+      const promotedNames = promoteWaitingSpectators(room)
+      room.infoMessage = `${currentPlayer.name} đã thắng ván này!`
+      if (promotedNames.length > 0) {
+        room.infoMessage += ` ${promotedNames.join(', ')} sẽ vào vai người chơi ở ván kế tiếp.`
+      }
+      emitRoomState(room)
+      scheduleAutoStartNextRound(room)
+      return
+    }
+
     advanceTurnAfterPlay(room)
     emitRoomState(room)
   })

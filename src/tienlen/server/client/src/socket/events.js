@@ -127,8 +127,11 @@ class SocketEvents {
           player: state.players.findIndex((player) => player.id === state.game?.currentTrick?.playerId),
         },
         currentTurn: state.players.findIndex((player) => player.id === state.game?.turnPlayerId),
+        winnerId: state.game?.winnerId || null,
+        roundResult: state.game?.roundResult || null,
         canStart: state.game?.canStart,
         started: state.game?.started,
+        canRobStarter: !!state.game?.canRobStarter,
         info: state.infoMessage,
       }
 
@@ -176,6 +179,10 @@ class SocketEvents {
   pass() {
     this.socket.emit('pass_turn', { roomId: this.roomId })
     this.socket.emit('passTurn', { roomCode: this.roomId })
+  }
+
+  starterDecision(action) {
+    this.socket.emit('starterDecision', { roomCode: this.roomId, action })
   }
 }
 

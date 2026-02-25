@@ -54,6 +54,19 @@ module.exports = {
       return interaction.reply({ embeds: [embed], ephemeral: true });
     }
 
+      const kickoffTime = match.kickoff ? new Date(match.kickoff).getTime() : 0;
+      if (kickoffTime && kickoffTime <= Date.now()) {
+        match.betLocked = true;
+        await match.save();
+
+        const embed = buildEmbed({
+          title: "Betting is locked 🔒",
+          description: "Match has reached kickoff time, betting is now closed. ⏰",
+          color: 0xf36c5c
+        });
+        return interaction.reply({ embeds: [embed], ephemeral: true });
+      }
+
     const odd = match.odds.find((o) => o.key === pickKey);
     if (!odd) {
       const embed = buildEmbed({

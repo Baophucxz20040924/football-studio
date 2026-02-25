@@ -7,7 +7,11 @@ module.exports = {
     .setName("matches")
     .setDescription("List open matches"),
   async execute(interaction) {
-    const matches = await Match.find({ status: "open" }).sort({ kickoff: 1 });
+    const matches = await Match.find({
+      status: "open",
+      betLocked: { $ne: true },
+      kickoff: { $gt: new Date() }
+    }).sort({ kickoff: 1 });
     if (matches.length === 0) {
       const embed = buildEmbed({
         title: "No open matches 🚫",

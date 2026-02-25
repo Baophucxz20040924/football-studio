@@ -17,6 +17,7 @@ const app = express();
 const PORT = Number(process.env.PORT || 3000);
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/football_bot";
 const STARTING_BALANCE = Number(process.env.STARTING_BALANCE || 0);
+const MATCH_AUTO_LOCK_INTERVAL_MS = Number(process.env.MATCH_AUTO_LOCK_INTERVAL_MS || 30_000);
 const AVIATOR_TICK_MS = 100;
 const AVIATOR_K = 0.12;
 const AVIATOR_HOUSE_EDGE = Number(process.env.AVIATOR_HOUSE_EDGE || 0.01);
@@ -37,6 +38,39 @@ const aviatorState = {
 const aviatorClients = new Map();
 const aviatorOpenBets = new Map();
 let aviatorRoundBets = [];
+let matchAutoLockIntervalId = null;
+
+async function lockMatchesAtKickoff() {
+  const now = new Date();
+  const result = await Match.updateMany(
+    {
+      status: "open",
+      betLocked: { $ne: true },
+      kickoff: { $lte: now }
+    },
+    {
+      $set: {
+        betLocked: true
+      }
+    }
+  );
+
+  if (result.modifiedCount > 0) {
+    console.log(`Auto-locked betting for ${result.modifiedCount} match(es) at kickoff.`);
+  }
+}
+
+function startMatchAutoLockScheduler() {
+  if (matchAutoLockIntervalId) {
+    clearInterval(matchAutoLockIntervalId);
+  }
+
+  matchAutoLockIntervalId = setInterval(() => {
+    void lockMatchesAtKickoff().catch((err) => {
+      console.error("Failed to auto-lock matches at kickoff:", err);
+    });
+  }, MATCH_AUTO_LOCK_INTERVAL_MS);
+}
 
 async function generateMatchCode() {
   for (let attempt = 0; attempt < 50; attempt += 1) {
@@ -955,6 +989,9 @@ client.once("ready", () => {
 
 async function start() {
   await mongoose.connect(MONGODB_URI);
+  await lockMatchesAtKickoff();
+  startMatchAutoLockScheduler();
+
   app.listen(PORT, () => {
     console.log(`Admin panel on http://localhost:${PORT}/admin`);
   });

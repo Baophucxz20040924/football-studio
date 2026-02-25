@@ -2,6 +2,8 @@ const { EmbedBuilder } = require("discord.js");
 const User = require("../../models/User");
 
 const STARTING_BALANCE = Number(process.env.STARTING_BALANCE || 0);
+const DISPLAY_TIME_ZONE = process.env.DISPLAY_TIME_ZONE || "Asia/Ho_Chi_Minh";
+const DISPLAY_LOCALE = process.env.DISPLAY_LOCALE || "en-US";
 
 function formatOdds(odds) {
   return odds.map((o) => `${o.key} x${o.multiplier}`).join(", ");
@@ -9,7 +11,11 @@ function formatOdds(odds) {
 
 function formatKickoff(date) {
   const local = new Date(date);
-  return local.toLocaleString();
+  try {
+    return local.toLocaleString(DISPLAY_LOCALE, { timeZone: DISPLAY_TIME_ZONE });
+  } catch {
+    return local.toLocaleString();
+  }
 }
 
 function buildEmbed({ title, description, color }) {

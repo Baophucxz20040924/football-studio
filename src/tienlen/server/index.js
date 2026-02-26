@@ -27,6 +27,7 @@ const ALLOWED_BET_UNITS = [1, 5, 10, 50, 100, 500]
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/football_bot'
 const STARTING_BALANCE = Number(process.env.STARTING_BALANCE || 0)
 const MIN_ENTRY_MULTIPLIER = Number(process.env.TIENLEN_MIN_ENTRY_MULTIPLIER || 15)
+const BALANCE_SYNC_INTERVAL_MS = Number(process.env.TIENLEN_BALANCE_SYNC_INTERVAL_MS || 2000)
 
 const rooms = new Map()
 
@@ -543,7 +544,7 @@ const buildStateForPlayer = (room, playerId) => {
   }
 }
 
-const emitRoomState = (room) => {
+const emitRoomStateSnapshot = (room) => {
   for (const player of room.players) {
     io.to(player.id).emit('roomState', buildStateForPlayer(room, player.id))
   }
@@ -551,6 +552,70 @@ const emitRoomState = (room) => {
   for (const spectator of room.spectators || []) {
     io.to(spectator.id).emit('roomState', buildStateForPlayer(room, spectator.id))
   }
+}
+
+const syncRoomBalancesFromDb = async (room, { force = false } = {}) => {
+  const now = Date.now()
+  const lastSyncAt = Number(room.lastBalanceSyncAt || 0)
+  if (!force && now - lastSyncAt < BALANCE_SYNC_INTERVAL_MS) {
+    return false
+  }
+
+  if (room.balanceSyncPromise) {
+    return room.balanceSyncPromise
+  }
+
+  room.balanceSyncPromise = (async () => {
+    const participants = [...room.players, ...(room.spectators || [])].filter(
+      (participant) => participant?.id && participant?.userId,
+    )
+
+    if (participants.length === 0) {
+      room.lastBalanceSyncAt = Date.now()
+      return false
+    }
+
+    const userIds = [...new Set(participants.map((participant) => participant.userId))]
+    const users = await User.find({ userId: { $in: userIds } }, { userId: 1, balance: 1 }).lean()
+    const balanceByUserId = new Map(users.map((user) => [String(user.userId), Number(user.balance || 0)]))
+
+    let changed = false
+    for (const participant of participants) {
+      const dbBalance = Number(balanceByUserId.get(String(participant.userId)) || 0)
+      const currentBalance = Number(room.money?.[participant.id] ?? 0)
+      if (dbBalance !== currentBalance) {
+        room.money[participant.id] = dbBalance
+        changed = true
+      }
+    }
+
+    room.lastBalanceSyncAt = Date.now()
+    return changed
+  })()
+
+  try {
+    return await room.balanceSyncPromise
+  } catch (error) {
+    console.error('Failed to sync room balances', {
+      roomCode: room.code,
+      message: error?.message || String(error),
+    })
+    return false
+  } finally {
+    room.balanceSyncPromise = null
+  }
+}
+
+const emitRoomState = (room) => {
+  emitRoomStateSnapshot(room)
+
+  syncRoomBalancesFromDb(room)
+    .then((changed) => {
+      if (changed) {
+        emitRoomStateSnapshot(room)
+      }
+    })
+    .catch(() => {})
 }
 
 const emitError = (socket, message) => {
@@ -622,7 +687,7 @@ const scheduleAutoStartNextRound = (room) => {
   room.infoMessage = `Ván mới sẽ tự bắt đầu sau ${secondsLeft}s.`
   emitRoomState(room)
 
-  room.autoStartInterval = setInterval(() => {
+  room.autoStartInterval = setInterval(async () => {
     if (room.players.length < 2) {
       clearAutoStartTimer(room)
       room.infoMessage = 'Đã hủy tự động bắt đầu vì không đủ người.'
@@ -644,6 +709,8 @@ const scheduleAutoStartNextRound = (room) => {
     }
 
     clearAutoStartTimer(room)
+
+    await syncRoomBalancesFromDb(room, { force: true })
 
     const { minBalance, movedPlayers } = enforceMinimumBalanceForRoom(room)
     if (movedPlayers.length > 0 && room.players.length < 2) {
@@ -930,6 +997,8 @@ io.on('connection', (socket) => {
       lastRoundResult: null,
       previousWinnerId: null,
       infoMessage: 'Tạo phòng thành công.',
+      lastBalanceSyncAt: Date.now(),
+      balanceSyncPromise: null,
     }
 
     rooms.set(code, room)
@@ -1000,7 +1069,7 @@ io.on('connection', (socket) => {
     emitRoomState(room)
   })
 
-  socket.on('startGame', ({ roomCode }) => {
+  socket.on('startGame', async ({ roomCode }) => {
     const room = rooms.get((roomCode || '').trim().toUpperCase())
     if (!room) {
       emitError(socket, 'Phòng không tồn tại.')
@@ -1011,6 +1080,8 @@ io.on('connection', (socket) => {
       emitError(socket, 'Chỉ chủ phòng mới được bắt đầu.')
       return
     }
+
+    await syncRoomBalancesFromDb(room, { force: true })
 
     const { minBalance, movedPlayers } = enforceMinimumBalanceForRoom(room)
     if (room.players.length < 2) {

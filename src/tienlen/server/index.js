@@ -574,6 +574,35 @@ const promoteWaitingSpectators = (room) => {
   return promoted
 }
 
+const enforceMinimumBalanceForRoom = (room) => {
+  const minBalance = getMinimumEntryBalance(room.betUnit)
+  room.spectators = room.spectators || []
+
+  const eligiblePlayers = []
+  const movedPlayers = []
+
+  for (const player of room.players) {
+    const balance = Number(room.money?.[player.id] ?? 0)
+    if (balance < minBalance) {
+      room.spectators.push(player)
+      movedPlayers.push(player)
+      continue
+    }
+    eligiblePlayers.push(player)
+  }
+
+  room.players = eligiblePlayers
+
+  if (!room.players.some((player) => player.id === room.ownerId)) {
+    room.ownerId = room.players[0]?.id ?? null
+  }
+
+  return {
+    minBalance,
+    movedPlayers,
+  }
+}
+
 const clearAutoStartTimer = (room) => {
   if (room.autoStartInterval) {
     clearInterval(room.autoStartInterval)
@@ -615,12 +644,25 @@ const scheduleAutoStartNextRound = (room) => {
     }
 
     clearAutoStartTimer(room)
-    setupGame(room)
+
+    const { minBalance, movedPlayers } = enforceMinimumBalanceForRoom(room)
+    if (movedPlayers.length > 0 && room.players.length < 2) {
+      room.infoMessage = `${movedPlayers.map((player) => player.name).join(', ')} không đủ ${minBalance} điểm để tiếp tục. Cần ít nhất 2 người đủ điểm để tự động bắt đầu.`
+      emitRoomState(room)
+      return
+    }
+
+    const preRoundNotice =
+      movedPlayers.length > 0
+        ? `${movedPlayers.map((player) => player.name).join(', ')} không đủ ${minBalance} điểm nên được chuyển sang khán giả.`
+        : ''
+
+    setupGame(room, preRoundNotice)
     emitRoomState(room)
   }, 1000)
 }
 
-const setupGame = (room) => {
+const setupGame = (room, preRoundNotice = '') => {
   const deck = shuffleDeck(buildDeck())
   const playerCount = room.players.length
   const hands = {}
@@ -664,11 +706,13 @@ const setupGame = (room) => {
 
   room.lastRoundResult = null
 
-  room.infoMessage = room.previousWinnerId
+  const roundInfo = room.previousWinnerId
     ? `${room.players.find((player) => player.id === starterId)?.name || 'Người thắng'} đi trước ván mới.`
     : threeSpadesHolderId
       ? `Ván đầu: ai có 3♠ đi trước.`
       : `Không xác định được người giữ 3♠, người có lá nhỏ nhất đi trước.`
+
+  room.infoMessage = preRoundNotice ? `${preRoundNotice} ${roundInfo}` : roundInfo
 }
 
 const hasCardsInHand = (hand, selectedCards) => {
@@ -968,14 +1012,24 @@ io.on('connection', (socket) => {
       return
     }
 
+    const { minBalance, movedPlayers } = enforceMinimumBalanceForRoom(room)
     if (room.players.length < 2) {
-      emitError(socket, 'Cần ít nhất 2 người để bắt đầu.')
+      if (movedPlayers.length > 0) {
+        room.infoMessage = `${movedPlayers.map((player) => player.name).join(', ')} không đủ ${minBalance} điểm nên chuyển sang khán giả.`
+      }
+      emitError(socket, `Cần ít nhất 2 người có tối thiểu ${minBalance} điểm để bắt đầu.`)
+      emitRoomState(room)
       return
     }
 
     clearAutoStartTimer(room)
 
-    setupGame(room)
+    const preRoundNotice =
+      movedPlayers.length > 0
+        ? `${movedPlayers.map((player) => player.name).join(', ')} không đủ ${minBalance} điểm nên được chuyển sang khán giả.`
+        : ''
+
+    setupGame(room, preRoundNotice)
     emitRoomState(room)
   })
 

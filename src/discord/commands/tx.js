@@ -15,6 +15,7 @@ const {
   primeEmojiCaches,
   getEmojiLookupCaches
 } = require("./utils");
+const { acquireChannelGameLock, releaseChannelGameLock } = require("./channelLocks");
 
 const BET_WINDOW_MS = 30_000;
 const MAX_IDLE_ROUNDS = 4;
@@ -446,20 +447,29 @@ module.exports = {
     .setName("tx")
     .setDescription("Tai xiu - dat cuoc tai/xiu/chan/le/so"),
   async execute(interaction) {
-    await primeEmojiCaches(interaction.guild);
-    const diceFaces = await resolveDiceFaces(interaction.guild);
-
     if (!interaction.channel) {
       return interaction.reply({ content: "Lệnh này chỉ dùng trong server.", ephemeral: true });
     }
 
     const channelId = interaction.channelId;
+    const lockedBy = acquireChannelGameLock(channelId, "Tài Xỉu");
+    if (lockedBy) {
+      return interaction.reply({
+        content: `${lockedBy} đang chạy ở kênh này. Hãy chờ phiên kết thúc.`,
+        ephemeral: true
+      });
+    }
+
     if (sessions.has(channelId)) {
+      releaseChannelGameLock(channelId);
       return interaction.reply({
         content: "Tài Xỉu đang chạy ở kênh này. Hãy chờ phiên kết thúc.",
         ephemeral: true
       });
     }
+
+    await primeEmojiCaches(interaction.guild);
+    const diceFaces = await resolveDiceFaces(interaction.guild);
 
     const session = {
       id: String(++sessionCounter),
@@ -481,6 +491,7 @@ module.exports = {
       await runSession(interaction.channel, session);
     } finally {
       sessions.delete(channelId);
+      releaseChannelGameLock(channelId);
     }
   }
 };

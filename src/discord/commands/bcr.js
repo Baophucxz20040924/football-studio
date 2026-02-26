@@ -15,6 +15,7 @@ const {
   primeEmojiCaches,
   findEmojiByName
 } = require("./utils");
+const { acquireChannelGameLock, releaseChannelGameLock } = require("./channelLocks");
 
 const BET_WINDOW_MS = 30_000;
 const MAX_IDLE_ROUNDS = 4;
@@ -632,7 +633,16 @@ module.exports = {
     }
 
     const channelId = interaction.channelId;
+    const lockedBy = acquireChannelGameLock(channelId, "Baccarat");
+    if (lockedBy) {
+      return interaction.reply({
+        content: `${lockedBy} đang chạy ở kênh này. Hãy chờ phiên kết thúc.`,
+        ephemeral: true
+      });
+    }
+
     if (sessions.has(channelId)) {
+      releaseChannelGameLock(channelId);
       return interaction.reply({
         content: "Baccarat đang chạy ở kênh này. Hãy chờ phiên kết thúc.",
         ephemeral: true
@@ -660,6 +670,7 @@ module.exports = {
       await runSession(interaction.channel, session);
     } finally {
       sessions.delete(channelId);
+      releaseChannelGameLock(channelId);
     }
   }
 };

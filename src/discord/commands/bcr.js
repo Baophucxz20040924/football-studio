@@ -7,7 +7,14 @@ const {
   TextInputBuilder,
   TextInputStyle
 } = require("discord.js");
-const { buildEmbed, normalizeAmount, getOrCreateUser, formatPoints } = require("./utils");
+const {
+  buildEmbed,
+  normalizeAmount,
+  getOrCreateUser,
+  formatPoints,
+  primeEmojiCaches,
+  findEmojiByName
+} = require("./utils");
 
 const BET_WINDOW_MS = 30_000;
 const MAX_IDLE_ROUNDS = 4;
@@ -90,7 +97,7 @@ function resolveCustomCardEmoji(guild, rank, suit) {
 
   const candidates = buildCardEmojiCandidates(rank, suit);
   for (const emojiName of candidates) {
-    const emoji = guild.emojis.cache.find((item) => item.name === emojiName);
+    const emoji = findEmojiByName(guild, emojiName);
     if (emoji) {
       return emoji.toString();
     }
@@ -104,7 +111,7 @@ function resolveCardBackEmoji(guild) {
     return CARD_BACK_EMOJI_FALLBACK;
   }
 
-  const emoji = guild.emojis.cache.find((item) => item.name === CARD_BACK_EMOJI_NAME);
+  const emoji = findEmojiByName(guild, CARD_BACK_EMOJI_NAME);
   return emoji ? emoji.toString() : CARD_BACK_EMOJI_FALLBACK;
 }
 
@@ -641,9 +648,7 @@ module.exports = {
       running: true
     };
 
-    if (interaction.guild) {
-      await interaction.guild.emojis.fetch().catch(() => null);
-    }
+    await primeEmojiCaches(interaction.guild);
     sessions.set(channelId, session);
 
     await interaction.reply({

@@ -7,7 +7,14 @@ const {
   TextInputBuilder,
   TextInputStyle
 } = require("discord.js");
-const { buildEmbed, normalizeAmount, getOrCreateUser, formatPoints } = require("./utils");
+const {
+  buildEmbed,
+  normalizeAmount,
+  getOrCreateUser,
+  formatPoints,
+  primeEmojiCaches,
+  getEmojiLookupCaches
+} = require("./utils");
 
 const BET_WINDOW_MS = 30_000;
 const MAX_IDLE_ROUNDS = 4;
@@ -44,23 +51,24 @@ function normalizeDiceEmojiName(name) {
 
 async function resolveDiceFaces(guild) {
   const resolved = DICE_FACES.slice();
-  if (!guild) {
-    return resolved;
-  }
-
-  const collection = await guild.emojis.fetch().catch(() => guild.emojis.cache);
   const valueToEmoji = new Map();
 
-  for (const emoji of collection.values()) {
-    const normalized = normalizeDiceEmojiName(emoji.name);
-    const match = normalized.match(/^dice([1-6])$/i);
-    if (!match) {
+  for (const collection of getEmojiLookupCaches(guild)) {
+    if (!collection) {
       continue;
     }
 
-    const value = Number(match[1]);
-    if (!valueToEmoji.has(value)) {
-      valueToEmoji.set(value, emoji.toString());
+    for (const emoji of collection.values()) {
+      const normalized = normalizeDiceEmojiName(emoji.name);
+      const match = normalized.match(/^dice([1-6])$/i);
+      if (!match) {
+        continue;
+      }
+
+      const value = Number(match[1]);
+      if (!valueToEmoji.has(value)) {
+        valueToEmoji.set(value, emoji.toString());
+      }
     }
   }
 
@@ -438,6 +446,7 @@ module.exports = {
     .setName("tx")
     .setDescription("Tai xiu - dat cuoc tai/xiu/chan/le/so"),
   async execute(interaction) {
+    await primeEmojiCaches(interaction.guild);
     const diceFaces = await resolveDiceFaces(interaction.guild);
 
     if (!interaction.channel) {

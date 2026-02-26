@@ -26,6 +26,7 @@ module.exports = {
       "🃏 **/tienlen** - Tiến Lên Miền Bắc",
       "",
       "**Hướng dẫn luật chơi**",
+      "🧾 **/helpbet** - Hướng dẫn đặt cược bằng lệnh /bet",
       "📘 **/helpfootball** - Xem luật Football Studio",
       "📙 **/helpbcr** - Xem luật Baccarat",
       "",

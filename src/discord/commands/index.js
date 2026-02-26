@@ -14,6 +14,7 @@ const commands = [
   require("./tx"),
   require("./helpfootball"),
   require("./helpbcr"),
+  require("./helpbet"),
   require("./daily"),
   require("./work")
 ];

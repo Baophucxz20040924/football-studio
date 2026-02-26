@@ -42,7 +42,7 @@ export class Card {
   disable() {
     this.disabled = true
     this.sprite.disableInteractive()
-    this.sprite.setAlpha(0.5)
+    this.sprite.setAlpha(1)
   }
 
   enable() {

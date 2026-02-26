@@ -609,6 +609,40 @@ userForm.addEventListener("submit", async (event) => {
   await fetchUsers();
 });
 
+const broadcastForm = document.getElementById("broadcast-form");
+broadcastForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+
+  const formData = new FormData(broadcastForm);
+  const message = String(formData.get("message") || "").trim();
+  const all = formData.get("all") === "on";
+
+  if (!message) {
+    alert("Please enter a message.");
+    return;
+  }
+
+  if (!all) {
+    alert("Please tick 'all' to send one message per guild.");
+    return;
+  }
+
+  const response = await fetch("/api/admin/broadcast", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message, all })
+  });
+
+  const payload = await response.json();
+  if (!response.ok) {
+    alert(payload.error || "Broadcast failed.");
+    return;
+  }
+
+  alert(`Broadcast done: sent ${payload.sent}/${payload.totalGuilds} guild(s).`);
+  broadcastForm.reset();
+});
+
 Promise.all([fetchMatches(), fetchUsers()]).catch((err) => {
   console.error(err);
 });

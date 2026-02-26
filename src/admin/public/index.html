@@ -83,6 +83,20 @@
           </label>
           <button type="submit">Add balance</button>
         </form>
+
+        <h2>Broadcast</h2>
+        <form id="broadcast-form" class="grid">
+          <label class="full">
+            Message
+            <textarea name="message" rows="3" required></textarea>
+          </label>
+          <label>
+            <input name="all" type="checkbox" checked />
+            Send to all guilds (1 channel/guild, 1 lần)
+          </label>
+          <button type="submit">Send broadcast</button>
+        </form>
+
         <div id="user-list" class="list"></div>
       </section>
     </main>

@@ -1,7 +1,14 @@
 const path = require("path");
 const express = require("express");
 const mongoose = require("mongoose");
-const { Client, GatewayIntentBits, REST, Routes } = require("discord.js");
+const {
+  Client,
+  GatewayIntentBits,
+  REST,
+  Routes,
+  ChannelType,
+  PermissionsBitField
+} = require("discord.js");
 require("dotenv").config();
 
 const Match = require("./models/Match");
@@ -154,6 +161,42 @@ function getClientIp(req) {
     return forwarded.split(",")[0].trim();
   }
   return req.ip || "";
+}
+
+function canSendToGuildTextChannel(channel, actor) {
+  if (!channel || channel.type !== ChannelType.GuildText || !actor) {
+    return false;
+  }
+
+  const perms = channel.permissionsFor(actor);
+  if (!perms) {
+    return false;
+  }
+
+  return perms.has([
+    PermissionsBitField.Flags.ViewChannel,
+    PermissionsBitField.Flags.SendMessages
+  ]);
+}
+
+async function resolveGuildBroadcastChannel(guild) {
+  if (!guild) {
+    return null;
+  }
+
+  const actor = guild.members?.me || client.user?.id;
+  if (canSendToGuildTextChannel(guild.systemChannel, actor)) {
+    return guild.systemChannel;
+  }
+
+  const channels = await guild.channels.fetch();
+  for (const channel of channels.values()) {
+    if (canSendToGuildTextChannel(channel, actor)) {
+      return channel;
+    }
+  }
+
+  return null;
 }
 
 app.use(express.json());
@@ -770,6 +813,60 @@ app.post("/api/users/:id/balance", async (req, res) => {
   await user.save();
 
   res.json({ ok: true, balance: user.balance });
+});
+
+app.post("/api/admin/broadcast", async (req, res) => {
+  const message = typeof req.body?.message === "string" ? req.body.message.trim() : "";
+  const all = Boolean(req.body?.all);
+
+  if (!message) {
+    return res.status(400).json({ error: "message is required" });
+  }
+
+  if (message.length > 1900) {
+    return res.status(400).json({ error: "message is too long" });
+  }
+
+  if (!all) {
+    return res.status(400).json({ error: "all must be true" });
+  }
+
+  if (!client.isReady()) {
+    return res.status(503).json({ error: "Discord client is not ready" });
+  }
+
+  const guilds = Array.from(client.guilds.cache.values());
+  let sent = 0;
+  const results = [];
+
+  for (const guild of guilds) {
+    try {
+      const channel = await resolveGuildBroadcastChannel(guild);
+      if (!channel) {
+        results.push({ guildId: guild.id, guildName: guild.name, sent: false, reason: "No sendable text channel" });
+        continue;
+      }
+
+      await channel.send({ content: message });
+      sent += 1;
+      results.push({ guildId: guild.id, guildName: guild.name, channelId: channel.id, sent: true });
+    } catch (error) {
+      results.push({
+        guildId: guild.id,
+        guildName: guild.name,
+        sent: false,
+        reason: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  }
+
+  res.json({
+    ok: true,
+    totalGuilds: guilds.length,
+    sent,
+    failed: guilds.length - sent,
+    results
+  });
 });
 
 app.post("/api/matches", async (req, res) => {

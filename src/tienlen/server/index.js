@@ -31,6 +31,41 @@ const BALANCE_SYNC_INTERVAL_MS = Number(process.env.TIENLEN_BALANCE_SYNC_INTERVA
 
 const rooms = new Map()
 
+// Lưu timer giới hạn lượt cho từng phòng
+const turnTimeouts = new Map()
+
+const TURN_TIME_LIMIT_MS = 30000 // 30 giây
+
+function clearTurnTimeout(roomCode) {
+  const timeout = turnTimeouts.get(roomCode)
+  if (timeout) {
+    clearTimeout(timeout)
+    turnTimeouts.delete(roomCode)
+  }
+}
+
+function scheduleTurnTimeout(room) {
+  clearTurnTimeout(room.code)
+  const game = room.game
+  if (!game?.started) return
+  const currentPlayer = room.players[game.turnIndex]
+  if (!currentPlayer) return
+  turnTimeouts.set(room.code, setTimeout(() => {
+    // Tự động pass nếu hết giờ
+    try {
+      if (!room.game?.started) return
+      const stillCurrent = room.players[room.game.turnIndex]?.id === currentPlayer.id
+      if (stillCurrent) {
+        room.infoMessage = `${currentPlayer.name} đã hết 30 giây, tự động bỏ lượt.`
+        room.game.passes.add(currentPlayer.id)
+        advanceTurnAfterPass(room)
+        emitRoomState(room)
+        scheduleTurnTimeout(room)
+      }
+    } catch (e) { console.error('Auto pass error', e) }
+  }, TURN_TIME_LIMIT_MS))
+}
+
 const findParticipantByUserId = (room, userId) => {
   const activePlayer = room.players.find((participant) => participant.userId === userId)
   if (activePlayer) {
@@ -832,8 +867,9 @@ const advanceTurnAfterPlay = (room) => {
       continue
     }
     game.turnIndex = idx
-    return
+    break
   }
+  scheduleTurnTimeout(room)
 }
 
 const advanceTurnAfterPass = (room) => {
@@ -847,6 +883,7 @@ const advanceTurnAfterPass = (room) => {
     game.passes = new Set()
     game.chopState = null
     room.infoMessage = 'Tất cả bỏ lượt. Người đánh cuối ra bài mới.'
+    scheduleTurnTimeout(room)
     return
   }
 
@@ -859,9 +896,10 @@ const advanceTurnAfterPass = (room) => {
     }
     if (!game.passes.has(candidateId)) {
       game.turnIndex = idx
-      return
+      break
     }
   }
+  scheduleTurnTimeout(room)
 }
 
 const normalizeTurnIndexAfterPlayerLeave = (room, removedPlayerId, removedIndex) => {
@@ -1102,9 +1140,11 @@ io.on('connection', (socket) => {
 
     setupGame(room, preRoundNotice)
     emitRoomState(room)
+    scheduleTurnTimeout(room)
   })
 
   socket.on('playCards', ({ roomCode, cards }) => {
+    clearTurnTimeout(roomCode)
     const room = rooms.get((roomCode || '').trim().toUpperCase())
     if (!room || !room.game?.started) {
       emitError(socket, 'Ván chơi chưa sẵn sàng.')
@@ -1287,6 +1327,7 @@ io.on('connection', (socket) => {
   })
 
   socket.on('passTurn', ({ roomCode }) => {
+    clearTurnTimeout(roomCode)
     const room = rooms.get((roomCode || '').trim().toUpperCase())
     if (!room || !room.game?.started) {
       emitError(socket, 'Ván chơi chưa sẵn sàng.')
@@ -1318,6 +1359,7 @@ io.on('connection', (socket) => {
   })
 
   socket.on('leaveRoom', ({ roomCode }) => {
+    clearTurnTimeout(roomCode)
     const code = (roomCode || '').trim().toUpperCase()
     const room = rooms.get(code)
     if (!room) {
@@ -1338,6 +1380,7 @@ io.on('connection', (socket) => {
   })
 
   socket.on('disconnect', () => {
+    clearTurnTimeout(socket.id)
     for (const [code, room] of rooms.entries()) {
       const existed = room.players.some((player) => player.id === socket.id)
       const spectatorExisted = (room.spectators || []).some((spectator) => spectator.id === socket.id)

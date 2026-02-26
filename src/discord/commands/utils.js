@@ -6,7 +6,7 @@ const DISPLAY_TIME_ZONE = process.env.DISPLAY_TIME_ZONE || "Asia/Ho_Chi_Minh";
 const DISPLAY_LOCALE = process.env.DISPLAY_LOCALE || "en-US";
 
 function formatOdds(odds) {
-  return odds.map((o) => `${o.key} x${o.multiplier}`).join(", ");
+  return odds.map((o) => `**${o.key}** x${o.multiplier}`).join(", ");
 }
 
 function formatKickoff(date) {

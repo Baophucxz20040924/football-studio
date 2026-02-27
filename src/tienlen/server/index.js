@@ -1401,6 +1401,30 @@ io.on('connection', (socket) => {
   })
 })
 
+
+app.get('/ranking', async (_req, res) => {
+  try {
+    // Exclude admin userId
+    const adminId = '386863309691027458';
+    // Find top 10 users by balance, excluding admin
+    const users = await User.find({ userId: { $ne: adminId } }, { userId: 1, userName: 1, balance: 1 })
+      .sort({ balance: -1 })
+      .limit(10)
+      .lean();
+    res.json({
+      ranking: users.map((u, idx) => ({
+        rank: idx + 1,
+        userId: u.userId,
+        userName: u.userName,
+        balance: u.balance,
+      }))
+    });
+  } catch (error) {
+    console.error('Failed to get ranking', error);
+    res.status(500).json({ error: 'Failed to get ranking' });
+  }
+});
+
 app.get('/health', (_req, res) => {
   res.json({ ok: true })
 })

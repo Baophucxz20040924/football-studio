@@ -21,7 +21,8 @@ module.exports = {
         ':second_place_medal:',
         ':third_place_medal:'
       ];
-      const lines = users.map((u, idx) => {
+      const { formatPoints } = require('./utils');
+      const fields = users.map((u, idx) => {
         let prefix = '';
         if (idx === 0) {
           prefix = '🥇';
@@ -33,10 +34,21 @@ module.exports = {
           prefix = `#${idx + 1}`;
         }
         let nameStyle = idx === 0 ? `**${u.userName || u.userId}**` : idx === 1 ? `*${u.userName || u.userId}*` : idx === 2 ? `__${u.userName || u.userId}__` : `${u.userName || u.userId}`;
-        const { formatPoints } = require('./utils');
-        return `${prefix} ${nameStyle}: ${formatPoints(u.balance)} điểm`;
+        return {
+          name: `${prefix} ${nameStyle}`,
+          value: `${formatPoints(u.balance)} điểm`,
+          inline: false
+        };
       });
-      await interaction.reply({ content: `🏆 **Top người giàu nhất:**\n${lines.join('\n')}`, ephemeral: false });
+      await interaction.reply({
+        embeds: [{
+          color: 0xFFD700,
+          title: '🏆 Top người giàu nhất',
+          fields: fields,
+          timestamp: new Date().toISOString(),
+        }],
+        ephemeral: false
+      });
     } catch (error) {
       console.error('Ranking command error:', error);
       await interaction.reply({ content: 'Lỗi khi lấy ranking.', ephemeral: true });

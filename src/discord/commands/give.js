@@ -13,12 +13,14 @@ module.exports = {
     .addUserOption((opt) =>
       opt.setName("nguoinhan").setDescription("Người nhận").setRequired(true)
     )
-    .addIntegerOption((opt) =>
-      opt.setName("sotien").setDescription("Số điểm cần chuyển").setRequired(true)
+    .addStringOption((opt) =>
+      opt.setName("sotien").setDescription("Số điểm cần chuyển (vd: 1k, 1m, 1k2)").setRequired(true)
     ),
   async execute(interaction) {
+
     const receiver = interaction.options.getUser("nguoinhan", true);
-    const amount = normalizeAmount(interaction.options.getInteger("sotien", true));
+    const rawAmount = interaction.options.getString("sotien", true);
+    const amount = normalizeAmount(rawAmount);
 
     if (!amount) {
       const embed = buildEmbed({
@@ -47,6 +49,7 @@ module.exports = {
         `Từ: **${senderName}**`,
         `Đến: **${receiverName}**`,
         `Số tiền: **${formatPoints(amount)}** \ud83d\udcb0`,
+        `\uD83D\uDCB8 Đã nhập: ${rawAmount}`,
         "Người gửi vui lòng xác nhận."
       ].join("\n"),
       color: 0xf6c244
@@ -82,8 +85,8 @@ module.exports = {
         return;
       }
 
-      const parsedAmount = Number(rawAmount);
-      if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      const parsedAmount = normalizeAmount(rawAmount);
+      if (!parsedAmount) {
         await btn.reply({ content: "Số tiền không hợp lệ.", ephemeral: true });
         return;
       }

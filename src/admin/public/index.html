@@ -68,20 +68,12 @@
 
       <section class="panel tab-page" data-page="users">
         <h2>Users</h2>
-        <form id="user-form" class="grid">
-          <label>
-            User ID
-            <input name="userId" type="text" required />
+        <form id="user-search-form" class="grid">
+          <label class="full">
+            Search by username
+            <input name="searchUserName" type="text" placeholder="Enter username..." required />
           </label>
-          <label>
-            User name
-            <input name="userName" type="text" />
-          </label>
-          <label>
-            Amount (+/-)
-            <input name="amount" type="number" required />
-          </label>
-          <button type="submit">Add balance</button>
+          <button type="submit">Search</button>
         </form>
 
         <h2>Broadcast</h2>

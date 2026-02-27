@@ -28,12 +28,42 @@ function buildEmbed({ title, description, color }) {
     .setColor(color);
 }
 
-function normalizeAmount(value) {
-  const amount = Number(value);
-  if (!Number.isFinite(amount) || amount <= 0) {
-    return null;
+
+// Hỗ trợ nhập 1k, 1m, 1k2, 1.2k, 20k, 300k, 1m2, 2.5m, v.v.
+function parseAmount(input) {
+  if (typeof input === "number") return input;
+  if (typeof input !== "string") return null;
+  const str = input.trim().toLowerCase();
+  if (!str) return null;
+  // 1k2, 1.2k, 20k, 300k, 1m, 2.5m, 1m2, v.v.
+  const match = str.match(/^([\d,.]+)([km]?)(\d*)$/);
+  if (!match) return null;
+  let [ , num, unit, tail ] = match;
+  num = num.replace(/,/g, "");
+  let amount = parseFloat(num);
+  if (isNaN(amount)) return null;
+  if (unit === "k") {
+    if (tail) {
+      // 1k2 = 1200
+      amount = amount * 1000 + parseInt(tail.padEnd(3, '0').slice(0,3));
+    } else {
+      amount *= 1000;
+    }
+  } else if (unit === "m") {
+    if (tail) {
+      // 1m2 = 1,200,000
+      amount = amount * 1000000 + parseInt(tail.padEnd(6, '0').slice(0,6));
+    } else {
+      amount *= 1000000;
+    }
   }
+  if (!Number.isFinite(amount) || amount <= 0) return null;
   return Math.floor(amount);
+}
+
+function normalizeAmount(value) {
+  // Giữ lại cho tương thích cũ, nhưng ưu tiên parseAmount
+  return parseAmount(value);
 }
 
 function formatPoints(value) {

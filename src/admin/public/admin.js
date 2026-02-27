@@ -523,7 +523,20 @@ function renderUsers(users) {
     return;
   }
 
-  users.forEach((user) => {
+  // If searching, push exact matches to top
+  const searchInput = document.querySelector('input[name="searchUserName"]');
+  let sortedUsers = users;
+  if (searchInput && searchInput.value.trim()) {
+    const searchVal = searchInput.value.trim().toLowerCase();
+    sortedUsers = users.slice().sort((a, b) => {
+      const aMatch = (a.userName || '').toLowerCase() === searchVal ? -1 : 0;
+      const bMatch = (b.userName || '').toLowerCase() === searchVal ? -1 : 0;
+      if (aMatch !== bMatch) return aMatch - bMatch;
+      // Optionally, sort by balance or userId
+      return 0;
+    });
+  }
+  sortedUsers.forEach((user) => {
     const card = document.createElement("div");
     card.className = "card";
 
@@ -531,28 +544,43 @@ function renderUsers(users) {
     card.innerHTML = `
       <div class="card-title">${name}</div>
       <div class="card-meta">User ID: ${user.userId}</div>
-      <div class="card-meta">Balance: ${user.balance}</div>
+      <div class="card-meta">Balance: <span class="user-balance">${user.balance}</span></div>
     `;
 
     const actions = document.createElement("div");
     actions.className = "actions";
 
+    // Add balance button
     const addBtn = document.createElement("button");
     addBtn.textContent = "Add balance";
     addBtn.addEventListener("click", async () => {
       const amount = prompt("Amount to add (use negative to subtract)", "100");
-      if (!amount) {
-        return;
-      }
+      if (!amount) return;
       await fetch(`/api/users/${user.userId}/balance`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ amount: Number(amount), userName: user.userName || "" })
       });
+      // Optionally, update only this user
       await fetchUsers();
     });
-
     actions.appendChild(addBtn);
+
+    // Update button
+    const updateBtn = document.createElement("button");
+    updateBtn.textContent = "Update";
+    updateBtn.addEventListener("click", async () => {
+      const newBalance = prompt("Set new balance", user.balance);
+      if (newBalance === null || newBalance === "") return;
+      await fetch(`/api/users/${user.userId}/balance`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: Number(newBalance) - Number(user.balance), userName: user.userName || "" })
+      });
+      await fetchUsers();
+    });
+    actions.appendChild(updateBtn);
+
     card.appendChild(actions);
     target.appendChild(card);
   });
@@ -586,27 +614,20 @@ form.addEventListener("submit", async (event) => {
   await fetchMatches();
 });
 
-const userForm = document.getElementById("user-form");
-userForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const formData = new FormData(userForm);
-  const userId = formData.get("userId");
-  const userName = formData.get("userName");
-  const amount = Number(formData.get("amount"));
 
-  if (!userId || !Number.isFinite(amount) || amount === 0) {
-    alert("Please enter a valid user id and amount.");
+const userSearchForm = document.getElementById("user-search-form");
+userSearchForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const formData = new FormData(userSearchForm);
+  const searchUserName = formData.get("searchUserName").trim();
+  if (!searchUserName) {
+    alert("Please enter a username to search.");
     return;
   }
-
-  await fetch(`/api/users/${userId}/balance`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ amount, userName })
-  });
-
-  userForm.reset();
-  await fetchUsers();
+  // Fetch user by username (assuming API supports it)
+  const res = await fetch(`/api/users?username=${encodeURIComponent(searchUserName)}`);
+  const users = await res.json();
+  renderUsers(users);
 });
 
 const broadcastForm = document.getElementById("broadcast-form");

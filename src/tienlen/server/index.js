@@ -749,14 +749,15 @@ const scheduleAutoStartNextRound = (room) => {
 
     const { minBalance, movedPlayers } = enforceMinimumBalanceForRoom(room)
     if (movedPlayers.length > 0 && room.players.length < 2) {
-      room.infoMessage = `${movedPlayers.map((player) => player.name).join(', ')} không đủ ${minBalance} điểm để tiếp tục. Cần ít nhất 2 người đủ điểm để tự động bắt đầu.`
+      const { formatPoints } = require('../discord/commands/utils');
+      room.infoMessage = `${movedPlayers.map((player) => player.name).join(', ')} không đủ ${formatPoints(minBalance)} điểm để tiếp tục. Cần ít nhất 2 người đủ điểm để tự động bắt đầu.`
       emitRoomState(room)
       return
     }
 
     const preRoundNotice =
       movedPlayers.length > 0
-        ? `${movedPlayers.map((player) => player.name).join(', ')} không đủ ${minBalance} điểm nên được chuyển sang khán giả.`
+        ? `${movedPlayers.map((player) => player.name).join(', ')} không đủ ${formatPoints(minBalance)} điểm nên được chuyển sang khán giả.`
         : ''
 
     setupGame(room, preRoundNotice)
@@ -1018,7 +1019,8 @@ io.on('connection', (socket) => {
 
     const minBalance = getMinimumEntryBalance(parsedBet)
     if (dbUser.balance < minBalance) {
-      emitError(socket, `Không đủ điểm vào bàn. Cần tối thiểu ${minBalance} điểm cho mức cược ${parsedBet}.`)
+      const { formatPoints } = require('../discord/commands/utils');
+      emitError(socket, `Không đủ điểm vào bàn. Cần tối thiểu ${formatPoints(minBalance)} điểm cho mức cược ${parsedBet}.`)
       return
     }
 
@@ -1082,7 +1084,8 @@ io.on('connection', (socket) => {
 
     const minBalance = getMinimumEntryBalance(room.betUnit)
     if (dbUser.balance < minBalance) {
-      emitError(socket, `Không đủ điểm vào bàn. Cần tối thiểu ${minBalance} điểm cho mức cược ${room.betUnit}.`)
+      const { formatPoints } = require('../discord/commands/utils');
+      emitError(socket, `Không đủ điểm vào bàn. Cần tối thiểu ${formatPoints(minBalance)} điểm cho mức cược ${room.betUnit}.`)
       return
     }
 
@@ -1124,9 +1127,11 @@ io.on('connection', (socket) => {
     const { minBalance, movedPlayers } = enforceMinimumBalanceForRoom(room)
     if (room.players.length < 2) {
       if (movedPlayers.length > 0) {
-        room.infoMessage = `${movedPlayers.map((player) => player.name).join(', ')} không đủ ${minBalance} điểm nên chuyển sang khán giả.`
+        const { formatPoints } = require('../discord/commands/utils');
+        room.infoMessage = `${movedPlayers.map((player) => player.name).join(', ')} không đủ ${formatPoints(minBalance)} điểm nên chuyển sang khán giả.`
       }
-      emitError(socket, `Cần ít nhất 2 người có tối thiểu ${minBalance} điểm để bắt đầu.`)
+      const { formatPoints } = require('../discord/commands/utils');
+      emitError(socket, `Cần ít nhất 2 người có tối thiểu ${formatPoints(minBalance)} điểm để bắt đầu.`)
       emitRoomState(room)
       return
     }
@@ -1135,7 +1140,7 @@ io.on('connection', (socket) => {
 
     const preRoundNotice =
       movedPlayers.length > 0
-        ? `${movedPlayers.map((player) => player.name).join(', ')} không đủ ${minBalance} điểm nên được chuyển sang khán giả.`
+        ? `${movedPlayers.map((player) => player.name).join(', ')} không đủ ${formatPoints(minBalance)} điểm nên được chuyển sang khán giả.`
         : ''
 
     setupGame(room, preRoundNotice)

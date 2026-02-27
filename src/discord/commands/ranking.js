@@ -33,7 +33,8 @@ module.exports = {
           prefix = `#${idx + 1}`;
         }
         let nameStyle = idx === 0 ? `**${u.userName || u.userId}**` : idx === 1 ? `*${u.userName || u.userId}*` : idx === 2 ? `__${u.userName || u.userId}__` : `${u.userName || u.userId}`;
-        return `${prefix} ${nameStyle}: ${u.balance} điểm`;
+        const { formatPoints } = require('./utils');
+        return `${prefix} ${nameStyle}: ${formatPoints(u.balance)} điểm`;
       });
       await interaction.reply({ content: `🏆 **Top người giàu nhất:**\n${lines.join('\n')}`, ephemeral: false });
     } catch (error) {

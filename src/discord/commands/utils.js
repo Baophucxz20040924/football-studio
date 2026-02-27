@@ -41,7 +41,7 @@ function formatPoints(value) {
   if (!Number.isFinite(amount)) {
     return String(value);
   }
-  return amount.toLocaleString("en-US");
+  return amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 async function getOrCreateUser(userId, userName) {

@@ -298,7 +298,8 @@ export class GameScene extends Phaser.Scene {
 
     const myPlayer = this.playersBySeat[this.mySeat]
     const myBalance = myPlayer?.money ?? 0
-    this.balanceText.setText(`Số dư: ${myBalance}`)
+    const { formatPoints } = require('../../../../discord/commands/utils');
+    this.balanceText.setText(`Số dư: ${formatPoints(myBalance)}`)
 
     this.currentTurn = Number.isInteger(state.currentTurn) ? state.currentTurn : -1
     this.tableState = state.table || { cards: [], combo: '' }
@@ -332,7 +333,8 @@ export class GameScene extends Phaser.Scene {
       }
 
       lines.push('')
-      lines.push(`Tổng ${winnerName} nhận: ${state.roundResult.totalUnits || 0} lá (${state.roundResult.totalAmount || 0} điểm)`)
+      const { formatPoints } = require('../../../../discord/commands/utils');
+      lines.push(`Tổng ${winnerName} nhận: ${state.roundResult.totalUnits || 0} lá (${formatPoints(state.roundResult.totalAmount || 0)} điểm)`)
       this.moneyEventText.setText(lines.join('\n'))
     } else {
       this.moneyEventText.setText(latestMoneyEvent ? `Tiền: ${latestMoneyEvent}` : '')

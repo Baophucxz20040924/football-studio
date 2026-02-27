@@ -89,7 +89,8 @@ const setProfileText = () => {
     return
   }
 
-  profileText.textContent = `Người chơi: ${sessionUser.userName} | Số dư: ${sessionUser.balance}`
+  const { formatPoints } = require('../../../../discord/commands/utils');
+  profileText.textContent = `Người chơi: ${sessionUser.userName} | Số dư: ${formatPoints(sessionUser.balance)}`
 }
 
 const enterGameScreen = () => {

@@ -455,39 +455,31 @@ module.exports = {
     const lockedBy = acquireChannelGameLock(channelId, "Tài Xỉu");
     if (lockedBy) {
       return interaction.reply({
-        content: `${lockedBy} đang chạy ở kênh này. Hãy chờ phiên kết thúc.`,
+        content: `${lockedBy} đang chạy ở kênh này. Hãy chờ phiên kết thúc rồi thử lại.`,
         ephemeral: true
       });
     }
-
-    if (sessions.has(channelId)) {
-      releaseChannelGameLock(channelId);
-      return interaction.reply({
-        content: "Tài Xỉu đang chạy ở kênh này. Hãy chờ phiên kết thúc.",
-        ephemeral: true
-      });
-    }
-
-    await primeEmojiCaches(interaction.guild);
-    const diceFaces = await resolveDiceFaces(interaction.guild);
-
-    const session = {
-      id: String(++sessionCounter),
-      channelId,
-      guild: interaction.guild,
-      diceFaces,
-      round: 0,
-      idleRounds: 0,
-      running: true
-    };
-    sessions.set(channelId, session);
-
-    await interaction.reply({
-      content: "Đã bắt đầu Tài Xỉu. Mọi người đặt cược!",
-      ephemeral: true
-    });
 
     try {
+      await primeEmojiCaches(interaction.guild);
+      const diceFaces = await resolveDiceFaces(interaction.guild);
+
+      const session = {
+        id: String(++sessionCounter),
+        channelId,
+        guild: interaction.guild,
+        diceFaces,
+        round: 0,
+        idleRounds: 0,
+        running: true
+      };
+      sessions.set(channelId, session);
+
+      await interaction.reply({
+        content: "Đã bắt đầu Tài Xỉu. Mọi người đặt cược!",
+        ephemeral: true
+      });
+
       await runSession(interaction.channel, session);
     } finally {
       sessions.delete(channelId);

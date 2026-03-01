@@ -1106,6 +1106,10 @@ const client = new Client({
   intents: [GatewayIntentBits.Guilds]
 });
 
+function isIgnorableInteractionError(error) {
+  return error?.code === 10062 || error?.code === 40060;
+}
+
 async function registerGuildCommands(guildId) {
   if (!discordToken || !clientId) {
     return;
@@ -1124,7 +1128,13 @@ async function registerGuildCommands(guildId) {
 }
 
 client.on("interactionCreate", async (interaction) => {
-  await handleInteraction(interaction);
+  try {
+    await handleInteraction(interaction);
+  } catch (error) {
+    if (!isIgnorableInteractionError(error)) {
+      console.error(error);
+    }
+  }
 });
 
 client.on("guildCreate", async (guild) => {
@@ -1158,4 +1168,12 @@ async function start() {
 start().catch((err) => {
   console.error(err);
   process.exit(1);
+});
+
+process.on("unhandledRejection", (reason) => {
+  if (isIgnorableInteractionError(reason)) {
+    return;
+  }
+
+  console.error("Unhandled promise rejection:", reason);
 });

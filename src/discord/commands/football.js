@@ -538,37 +538,29 @@ module.exports = {
     const lockedBy = acquireChannelGameLock(channelId, "Football Studio");
     if (lockedBy) {
       return interaction.reply({
-        content: `${lockedBy} đang chạy ở kênh này. Hãy chờ phiên kết thúc.`,
+        content: `${lockedBy} đang chạy ở kênh này. Hãy chờ phiên kết thúc rồi thử lại.`,
         ephemeral: true
       });
     }
-
-    if (sessions.has(channelId)) {
-      releaseChannelGameLock(channelId);
-      return interaction.reply({
-        content: "Football Studio đang chạy ở kênh này. Hãy chờ phiên kết thúc.",
-        ephemeral: true
-      });
-    }
-
-    const session = {
-      id: String(++sessionCounter),
-      channelId,
-      guild: interaction.guild,
-      round: 0,
-      idleRounds: 0,
-      running: true
-    };
-
-    await primeEmojiCaches(interaction.guild);
-    sessions.set(channelId, session);
-
-    await interaction.reply({
-      content: "Đã bắt đầu Football Studio. Mọi người đặt cược!",
-      ephemeral: true
-    });
 
     try {
+      const session = {
+        id: String(++sessionCounter),
+        channelId,
+        guild: interaction.guild,
+        round: 0,
+        idleRounds: 0,
+        running: true
+      };
+
+      await primeEmojiCaches(interaction.guild);
+      sessions.set(channelId, session);
+
+      await interaction.reply({
+        content: "Đã bắt đầu Football Studio. Mọi người đặt cược!",
+        ephemeral: true
+      });
+
       await runSession(interaction.channel, session);
     } finally {
       sessions.delete(channelId);

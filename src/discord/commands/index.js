@@ -24,6 +24,10 @@ function getCommandData() {
   return commands.map((cmd) => cmd.data.toJSON());
 }
 
+function isIgnorableInteractionError(error) {
+  return error?.code === 10062 || error?.code === 40060;
+}
+
 async function handleInteraction(interaction) {
   if (!interaction.isChatInputCommand()) {
     return;
@@ -37,9 +41,21 @@ async function handleInteraction(interaction) {
   try {
     await command.execute(interaction);
   } catch (err) {
+    if (isIgnorableInteractionError(err)) {
+      return;
+    }
+
     console.error(err);
-    if (!interaction.replied) {
-      await interaction.reply({ content: "Something went wrong.", ephemeral: true });
+    try {
+      if (interaction.deferred || interaction.replied) {
+        await interaction.followUp({ content: "Something went wrong.", ephemeral: true });
+      } else {
+        await interaction.reply({ content: "Something went wrong.", ephemeral: true });
+      }
+    } catch (replyError) {
+      if (!isIgnorableInteractionError(replyError)) {
+        console.error(replyError);
+      }
     }
   }
 }

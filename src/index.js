@@ -27,8 +27,13 @@ const STARTING_BALANCE = Number(process.env.STARTING_BALANCE || 0);
 const MATCH_AUTO_LOCK_INTERVAL_MS = Number(process.env.MATCH_AUTO_LOCK_INTERVAL_MS || 30_000);
 const KICKOFF_UTC_OFFSET_MINUTES = Number(process.env.KICKOFF_UTC_OFFSET_MINUTES || 420);
 const ESPN_EPL_AUTO_SYNC_ENABLED = process.env.ESPN_EPL_AUTO_SYNC_ENABLED !== "false";
+const ESPN_EPL_AUTO_CLOSE_ENABLED = process.env.ESPN_EPL_AUTO_CLOSE_ENABLED !== "false";
 const ESPN_EPL_CREATE_SYNC_INTERVAL_MS = Number(process.env.ESPN_EPL_CREATE_SYNC_INTERVAL_MS || 30 * 60_000);
 const ESPN_EPL_LIVE_SYNC_INTERVAL_MS = Number(process.env.ESPN_EPL_LIVE_SYNC_INTERVAL_MS || 2 * 60_000);
+const ESPN_EPL_PREMATCH_SYNC_CHECK_INTERVAL_MS = Number(process.env.ESPN_EPL_PREMATCH_SYNC_CHECK_INTERVAL_MS || 10 * 60_000);
+const ESPN_EPL_PREMATCH_SYNC_FAR_INTERVAL_MS = Number(process.env.ESPN_EPL_PREMATCH_SYNC_FAR_INTERVAL_MS || 2 * 60 * 60_000);
+const ESPN_EPL_PREMATCH_SYNC_NEAR_INTERVAL_MS = Number(process.env.ESPN_EPL_PREMATCH_SYNC_NEAR_INTERVAL_MS || 60 * 60_000);
+const ESPN_EPL_PREMATCH_NEAR_WINDOW_MS = Number(process.env.ESPN_EPL_PREMATCH_NEAR_WINDOW_MS || 2 * 60 * 60_000);
 const ESPN_EPL_SYNC_DAYS_AHEAD = Number(process.env.ESPN_EPL_SYNC_DAYS_AHEAD || 7);
 const ESPN_EPL_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/scoreboard";
 const AVIATOR_TICK_MS = 100;
@@ -53,8 +58,10 @@ const aviatorOpenBets = new Map();
 let aviatorRoundBets = [];
 let matchAutoLockIntervalId = null;
 let eplCreateSyncIntervalId = null;
+let eplPrematchSyncIntervalId = null;
 let eplLiveSyncIntervalId = null;
 let eplCreateSyncInProgress = false;
+let eplPrematchSyncInProgress = false;
 let eplLiveSyncInProgress = false;
 
 function parseKickoffInput(value) {
@@ -231,6 +238,118 @@ function parseAmericanOddsToMultiplier(value) {
   return Math.round(decimal * 100) / 100;
 }
 
+function parseTotalLineValue(value) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  const raw = String(value).trim().toLowerCase();
+  if (!raw) {
+    return null;
+  }
+
+  const normalized = raw.replace(/^([ou])\s*/i, "");
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+
+  return parsed;
+}
+
+function formatTotalLineForKey(line) {
+  if (!Number.isFinite(line)) {
+    return "";
+  }
+
+  if (Number.isInteger(line)) {
+    return String(line);
+  }
+
+  return String(Math.round(line * 100) / 100);
+}
+
+function parseTotalLineFromPickKey(key) {
+  const match = String(key || "").trim().match(/^(?:big|small)\(([-+]?\d+(?:\.\d+)?)\)$/i);
+  if (!match) {
+    return null;
+  }
+
+  const line = Number(match[1]);
+  return Number.isFinite(line) ? line : null;
+}
+
+function selectBalancedTotalOdds(odds) {
+  if (!odds || typeof odds !== "object") {
+    return null;
+  }
+
+  const candidates = [];
+
+  const topLevelLine = parseTotalLineValue(odds.overUnder);
+  const topLevelOver = parseAmericanOddsToMultiplier(odds.overOdds);
+  const topLevelUnder = parseAmericanOddsToMultiplier(odds.underOdds);
+  if (Number.isFinite(topLevelLine) && Number.isFinite(topLevelOver) && Number.isFinite(topLevelUnder)) {
+    candidates.push({ line: topLevelLine, overMultiplier: topLevelOver, underMultiplier: topLevelUnder });
+  }
+
+  const totalMarkets = [];
+  if (odds.total && typeof odds.total === "object") {
+    totalMarkets.push(odds.total);
+  }
+
+  if (Array.isArray(odds.totals)) {
+    for (const item of odds.totals) {
+      if (item && typeof item === "object") {
+        totalMarkets.push(item);
+      }
+    }
+  }
+
+  for (const market of totalMarkets) {
+    const overNode = market?.over || {};
+    const underNode = market?.under || {};
+
+    const line = parseTotalLineValue(
+      overNode?.close?.line
+      ?? overNode?.open?.line
+      ?? underNode?.close?.line
+      ?? underNode?.open?.line
+      ?? market?.line
+      ?? market?.value
+    );
+
+    const overMultiplier = parseAmericanOddsToMultiplier(overNode?.close?.odds ?? overNode?.open?.odds ?? overNode?.odds);
+    const underMultiplier = parseAmericanOddsToMultiplier(underNode?.close?.odds ?? underNode?.open?.odds ?? underNode?.odds);
+
+    if (Number.isFinite(line) && Number.isFinite(overMultiplier) && Number.isFinite(underMultiplier)) {
+      candidates.push({ line, overMultiplier, underMultiplier });
+    }
+  }
+
+  if (!candidates.length) {
+    return null;
+  }
+
+  candidates.sort((a, b) => {
+    const gapA = Math.abs((1 / a.overMultiplier) - (1 / a.underMultiplier));
+    const gapB = Math.abs((1 / b.overMultiplier) - (1 / b.underMultiplier));
+    if (gapA !== gapB) {
+      return gapA - gapB;
+    }
+
+    const lineDistanceA = Math.abs(a.line - 2.5);
+    const lineDistanceB = Math.abs(b.line - 2.5);
+    return lineDistanceA - lineDistanceB;
+  });
+
+  return candidates[0];
+}
+
 function extractEplOdds(competition) {
   const odds = Array.isArray(competition?.odds) ? competition.odds[0] : null;
   const moneyline = odds?.moneyline || {};
@@ -247,7 +366,21 @@ function extractEplOdds(competition) {
     { key: "away", multiplier: parseAmericanOddsToMultiplier(awayAmerican) }
   ].filter((item) => Number.isFinite(item.multiplier));
 
-  return mapped;
+  const totalMarket = selectBalancedTotalOdds(odds);
+  if (totalMarket) {
+    const line = formatTotalLineForKey(totalMarket.line);
+    if (line) {
+      mapped.push({ key: `big(${line})`, multiplier: totalMarket.overMultiplier });
+      mapped.push({ key: `small(${line})`, multiplier: totalMarket.underMultiplier });
+    }
+  }
+
+  const dedupedByKey = new Map();
+  for (const item of mapped) {
+    dedupedByKey.set(item.key, item);
+  }
+
+  return Array.from(dedupedByKey.values());
 }
 
 function buildMatchFromEspnEvent(event) {
@@ -257,9 +390,6 @@ function buildMatchFromEspnEvent(event) {
   }
 
   const state = competition?.status?.type?.state || event?.status?.type?.state;
-  if (state === "post") {
-    return null;
-  }
 
   const home = getCompetitor(competition, "home");
   const away = getCompetitor(competition, "away");
@@ -283,6 +413,7 @@ function buildMatchFromEspnEvent(event) {
 
   return {
     espnEventId: String(event?.id || competition?.id || "").trim(),
+    state: String(state || "").toLowerCase(),
     homeTeam,
     awayTeam,
     stadium: competition?.venue?.fullName || competition?.venue?.displayName || event?.venue?.displayName || "",
@@ -310,6 +441,83 @@ async function fetchEplScoreboardEvents(dates) {
   return Array.isArray(payload?.events) ? payload.events : [];
 }
 
+function deriveWinnerKeysByScore(scoreHome, scoreAway, odds = []) {
+  if (!Number.isFinite(scoreHome) || !Number.isFinite(scoreAway)) {
+    return [];
+  }
+
+  const winnerKeys = [];
+  const totalGoals = scoreHome + scoreAway;
+
+  if (scoreHome > scoreAway) {
+    winnerKeys.push("home");
+  } else if (scoreHome < scoreAway) {
+    winnerKeys.push("away");
+  } else {
+    winnerKeys.push("draw");
+  }
+
+  const totalLines = new Set();
+  for (const odd of Array.isArray(odds) ? odds : []) {
+    const line = parseTotalLineFromPickKey(odd?.key);
+    if (Number.isFinite(line)) {
+      totalLines.add(line);
+    }
+  }
+
+  for (const line of totalLines) {
+    const normalized = formatTotalLineForKey(line);
+    if (!normalized) {
+      continue;
+    }
+
+    if (totalGoals > line) {
+      winnerKeys.push(`big(${normalized})`);
+    } else {
+      winnerKeys.push(`small(${normalized})`);
+    }
+  }
+
+  return winnerKeys;
+}
+
+async function closeMatchAndSettleBets(match, { winnerKeys, scoreHome, scoreAway }) {
+  const uniqueWinners = Array.from(new Set((winnerKeys || []).filter(Boolean)));
+  if (!uniqueWinners.length) {
+    throw new Error("winnerKeys is required");
+  }
+
+  match.status = "closed";
+  match.isLive = false;
+  match.betLocked = true;
+  match.winnerKey = uniqueWinners[0] || "";
+  match.winnerKeys = uniqueWinners;
+  match.scoreHome = Number.isFinite(scoreHome) ? scoreHome : match.scoreHome;
+  match.scoreAway = Number.isFinite(scoreAway) ? scoreAway : match.scoreAway;
+  await match.save();
+
+  const bets = await Bet.find({ matchId: match._id, status: "open" });
+  for (const bet of bets) {
+    const user = await User.findOne({ userId: bet.userId });
+    if (!user) {
+      continue;
+    }
+
+    if (uniqueWinners.includes(bet.pickKey)) {
+      const payout = Math.round(bet.amount * bet.multiplier);
+      user.balance += payout;
+      bet.status = "won";
+      bet.payout = payout;
+    } else {
+      bet.status = "lost";
+      bet.payout = 0;
+    }
+
+    await user.save();
+    await bet.save();
+  }
+}
+
 async function syncEplCreateMatches() {
   if (!ESPN_EPL_AUTO_SYNC_ENABLED) {
     return;
@@ -325,6 +533,7 @@ async function syncEplCreateMatches() {
     const dates = getEplDateRangeToken(ESPN_EPL_SYNC_DAYS_AHEAD);
     const events = await fetchEplScoreboardEvents(dates);
     let created = 0;
+    let updated = 0;
 
     for (const event of events) {
       const incoming = buildMatchFromEspnEvent(event);
@@ -350,13 +559,129 @@ async function syncEplCreateMatches() {
         created += 1;
         continue;
       }
+
+      if (existing.status !== "open") {
+        continue;
+      }
+
+      let changed = false;
+
+      if (existing.homeTeam !== incoming.homeTeam) {
+        existing.homeTeam = incoming.homeTeam;
+        changed = true;
+      }
+
+      if (existing.awayTeam !== incoming.awayTeam) {
+        existing.awayTeam = incoming.awayTeam;
+        changed = true;
+      }
+
+      const incomingStadium = incoming.stadium || "";
+      if ((existing.stadium || "") !== incomingStadium) {
+        existing.stadium = incomingStadium;
+        changed = true;
+      }
+
+      if (new Date(existing.kickoff).getTime() !== incoming.kickoff.getTime()) {
+        existing.kickoff = incoming.kickoff;
+        changed = true;
+      }
+
+      if (changed) {
+        await existing.save();
+        updated += 1;
+      }
     }
 
-    if (created > 0) {
-      console.log(`EPL create sync complete: created ${created} match(es).`);
+    if (created > 0 || updated > 0) {
+      console.log(`EPL create sync complete: created ${created} match(es), updated ${updated} match(es).`);
     }
   } finally {
     eplCreateSyncInProgress = false;
+  }
+}
+
+async function syncEplPrematchOdds() {
+  if (!ESPN_EPL_AUTO_SYNC_ENABLED) {
+    return;
+  }
+
+  if (eplPrematchSyncInProgress) {
+    return;
+  }
+
+  eplPrematchSyncInProgress = true;
+
+  try {
+    const now = new Date();
+    const candidates = await Match.find({
+      status: "open",
+      espnEventId: { $exists: true, $ne: "" },
+      kickoff: { $gt: now }
+    });
+
+    if (candidates.length === 0) {
+      return;
+    }
+
+    const dates = getEplDateRangeToken(ESPN_EPL_SYNC_DAYS_AHEAD);
+    const events = await fetchEplScoreboardEvents(dates);
+    const incomingByEventId = new Map();
+
+    for (const event of events) {
+      const incoming = buildMatchFromEspnEvent(event);
+      if (incoming?.espnEventId) {
+        incomingByEventId.set(incoming.espnEventId, incoming);
+      }
+    }
+
+    let checked = 0;
+    let oddsUpdated = 0;
+
+    for (const match of candidates) {
+      const incoming = incomingByEventId.get(match.espnEventId);
+      if (!incoming || incoming.odds.length === 0) {
+        continue;
+      }
+
+      const kickoffTime = new Date(match.kickoff).getTime();
+      if (!Number.isFinite(kickoffTime) || kickoffTime <= Date.now()) {
+        continue;
+      }
+
+      const timeToKickoffMs = kickoffTime - Date.now();
+      const requiredIntervalMs = timeToKickoffMs <= ESPN_EPL_PREMATCH_NEAR_WINDOW_MS
+        ? ESPN_EPL_PREMATCH_SYNC_NEAR_INTERVAL_MS
+        : ESPN_EPL_PREMATCH_SYNC_FAR_INTERVAL_MS;
+
+      const lastSyncedAt = match.prematchOddsSyncedAt ? new Date(match.prematchOddsSyncedAt) : null;
+      const lastSyncedMs = lastSyncedAt && Number.isFinite(lastSyncedAt.getTime())
+        ? lastSyncedAt.getTime()
+        : null;
+
+      if (lastSyncedMs && (Date.now() - lastSyncedMs) < requiredIntervalMs) {
+        continue;
+      }
+
+      checked += 1;
+      const beforeOdds = JSON.stringify(match.odds || []);
+      const nextOdds = JSON.stringify(incoming.odds);
+
+      match.odds = incoming.odds;
+      match.prematchOddsSyncedAt = now;
+
+      if (beforeOdds !== nextOdds) {
+        oddsUpdated += 1;
+      }
+
+      await match.save();
+    }
+
+    if (checked > 0 || oddsUpdated > 0) {
+      console.log(`EPL prematch odds sync: checked ${checked}, updated ${oddsUpdated}.`);
+    }
+  } finally {
+    eplPrematchSyncInProgress = false;
   }
 }
 
@@ -373,13 +698,10 @@ async function syncEplLiveOddsAndScores() {
 
   try {
     const now = new Date();
-    const windowStart = new Date(now.getTime() - 30 * 60_000);
-    const windowEnd = new Date(now.getTime() + 3 * 60 * 60_000);
-
     const candidates = await Match.find({
       status: "open",
       espnEventId: { $exists: true, $ne: "" },
-      kickoff: { $gte: windowStart, $lte: windowEnd }
+      kickoff: { $lte: now }
     });
 
     if (candidates.length === 0) {
@@ -400,6 +722,7 @@ async function syncEplLiveOddsAndScores() {
     let updated = 0;
     let oddsUpdated = 0;
     let scoresUpdated = 0;
+    let autoClosed = 0;
 
     for (const match of candidates) {
       const incoming = incomingByEventId.get(match.espnEventId);
@@ -430,15 +753,29 @@ async function syncEplLiveOddsAndScores() {
         changed = true;
       }
 
+      const isPostState = incoming.state === "post";
+      if (ESPN_EPL_AUTO_CLOSE_ENABLED && isPostState) {
+        const winnerKeys = deriveWinnerKeysByScore(incoming.scoreHome, incoming.scoreAway, match.odds);
+        if (winnerKeys.length > 0) {
+          await closeMatchAndSettleBets(match, {
+            winnerKeys,
+            scoreHome: incoming.scoreHome,
+            scoreAway: incoming.scoreAway
+          });
+          autoClosed += 1;
+          continue;
+        }
+      }
+
       if (changed) {
         await match.save();
         updated += 1;
       }
     }
 
-    if (updated > 0 || oddsUpdated > 0 || scoresUpdated > 0) {
+    if (updated > 0 || oddsUpdated > 0 || scoresUpdated > 0 || autoClosed > 0) {
       console.log(
-        `EPL live sync complete: updated ${updated}, odds updated ${oddsUpdated}, scores updated ${scoresUpdated}.`
+        `EPL live sync complete: updated ${updated}, odds updated ${oddsUpdated}, scores updated ${scoresUpdated}, auto closed ${autoClosed}.`
       );
     }
   } finally {
@@ -478,6 +815,23 @@ function startEplLiveSyncScheduler() {
       console.error("Failed to sync EPL live odds/score from ESPN:", error);
     });
   }, ESPN_EPL_LIVE_SYNC_INTERVAL_MS);
+}
+
+function startEplPrematchSyncScheduler() {
+  if (eplPrematchSyncIntervalId) {
+    clearInterval(eplPrematchSyncIntervalId);
+  }
+
+  if (!ESPN_EPL_AUTO_SYNC_ENABLED) {
+    console.log("EPL auto-sync is disabled (ESPN_EPL_AUTO_SYNC_ENABLED=false).");
+    return;
+  }
+
+  eplPrematchSyncIntervalId = setInterval(() => {
+    void syncEplPrematchOdds().catch((error) => {
+      console.error("Failed to sync EPL prematch odds from ESPN:", error);
+    });
+  }, ESPN_EPL_PREMATCH_SYNC_CHECK_INTERVAL_MS);
 }
 
 async function generateMatchCode() {
@@ -1424,34 +1778,11 @@ app.post("/api/matches/:id/close", async (req, res) => {
     return res.status(400).json({ error: "Match already closed" });
   }
 
-  match.status = "closed";
-  match.isLive = false;
-  match.winnerKey = uniqueWinners[0] || "";
-  match.winnerKeys = uniqueWinners;
-  match.scoreHome = Number.isFinite(scoreHome) ? scoreHome : match.scoreHome;
-  match.scoreAway = Number.isFinite(scoreAway) ? scoreAway : match.scoreAway;
-  await match.save();
-
-  const bets = await Bet.find({ matchId: match._id, status: "open" });
-  for (const bet of bets) {
-    const user = await User.findOne({ userId: bet.userId });
-    if (!user) {
-      continue;
-    }
-
-    if (uniqueWinners.includes(bet.pickKey)) {
-      const payout = Math.round(bet.amount * bet.multiplier);
-      user.balance += payout;
-      bet.status = "won";
-      bet.payout = payout;
-    } else {
-      bet.status = "lost";
-      bet.payout = 0;
-    }
-
-    await user.save();
-    await bet.save();
-  }
+  await closeMatchAndSettleBets(match, {
+    winnerKeys: uniqueWinners,
+    scoreHome,
+    scoreAway
+  });
 
   res.json({ ok: true });
 });
@@ -1517,12 +1848,16 @@ async function start() {
   await syncEplCreateMatches().catch((error) => {
     console.error("Initial EPL create sync failed:", error);
   });
+  await syncEplPrematchOdds().catch((error) => {
+    console.error("Initial EPL prematch sync failed:", error);
+  });
   await syncEplLiveOddsAndScores().catch((error) => {
     console.error("Initial EPL live sync failed:", error);
   });
   await lockMatchesAtKickoff();
   startMatchAutoLockScheduler();
   startEplCreateSyncScheduler();
+  startEplPrematchSyncScheduler();
   startEplLiveSyncScheduler();
 
   app.listen(PORT, () => {

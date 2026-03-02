@@ -24,13 +24,18 @@ module.exports = {
     const description = matches
       .map((m) => {
         const kickoff = formatKickoff(m.kickoff);
-        const odds = formatOdds(m.odds);
+        const oddsList = Array.isArray(m.odds) ? m.odds : [];
+        const oneXTwo = oddsList.filter((item) => ["home", "draw", "away"].includes(item.key));
+        const totals = oddsList.filter((item) => /^(big|small)\(/i.test(item.key));
+        const oneXTwoText = oneXTwo.length ? formatOdds(oneXTwo) : "-";
+        const totalsText = totals.length ? formatOdds(totals) : "Chưa có";
         return [
           `**${m.homeTeam} vs ${m.awayTeam}**`,
           `Code: ${m.matchCode ?? "-"}`,
           `Kickoff: ${kickoff}`,
           `Stadium: ${m.stadium || "-"} \ud83c\udfdf\ufe0f`,
-          `Odds: ${odds}`
+          `Odds 1x2: ${oneXTwoText}`,
+          `Odds T/X: ${totalsText}`
         ].join("\n");
       })
       .join("\n\n");

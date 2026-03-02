@@ -34,6 +34,7 @@ const MatchSchema = new mongoose.Schema(
     winnerKey: { type: String, default: "" },
     winnerKeys: { type: [String], default: [] },
     isLive: { type: Boolean, default: false },
+    prematchOddsSyncedAt: { type: Date, default: null },
     goals: { type: [GoalSchema], default: [] },
     betLocked: { type: Boolean, default: false }
   },

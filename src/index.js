@@ -88,7 +88,7 @@ function parseKickoffInput(value) {
 
 async function lockMatchesAtKickoff() {
   const now = new Date();
-  const result = await Match.updateMany(
+  const lockResult = await Match.updateMany(
     {
       status: "open",
       betLocked: { $ne: true },
@@ -101,8 +101,25 @@ async function lockMatchesAtKickoff() {
     }
   );
 
-  if (result.modifiedCount > 0) {
-    console.log(`Auto-locked betting for ${result.modifiedCount} match(es) at kickoff.`);
+  const liveResult = await Match.updateMany(
+    {
+      status: "open",
+      isLive: { $ne: true },
+      kickoff: { $lte: now }
+    },
+    {
+      $set: {
+        isLive: true
+      }
+    }
+  );
+
+  if (lockResult.modifiedCount > 0) {
+    console.log(`Auto-locked betting for ${lockResult.modifiedCount} match(es) at kickoff.`);
+  }
+
+  if (liveResult.modifiedCount > 0) {
+    console.log(`Auto-set live for ${liveResult.modifiedCount} match(es) at kickoff.`);
   }
 }
 
@@ -1063,6 +1080,7 @@ app.post("/api/matches/:id/close", async (req, res) => {
   }
 
   match.status = "closed";
+  match.isLive = false;
   match.winnerKey = uniqueWinners[0] || "";
   match.winnerKeys = uniqueWinners;
   match.scoreHome = Number.isFinite(scoreHome) ? scoreHome : match.scoreHome;

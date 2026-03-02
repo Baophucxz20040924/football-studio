@@ -18,7 +18,7 @@ const {
 const { acquireChannelGameLock, releaseChannelGameLock } = require("./channelLocks");
 
 const BET_WINDOW_MS = 30_000;
-const MAX_IDLE_ROUNDS = 4;
+const MAX_IDLE_ROUNDS = 2;
 const PLAYER_PAYOUT_MULTIPLIER = 2;
 const BANKER_PAYOUT_MULTIPLIER = 1.95;
 const TIE_PAYOUT_MULTIPLIER = 10;

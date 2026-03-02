@@ -17,7 +17,8 @@ const commands = [
   require("./helpbet"),
   require("./daily"),
   require("./work"),
-  require("./ranking")
+  require("./ranking"),
+  require("./epl-rank")
 ];
 
 function getCommandData() {

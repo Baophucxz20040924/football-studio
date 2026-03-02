@@ -18,7 +18,7 @@ const {
 const { acquireChannelGameLock, releaseChannelGameLock } = require("./channelLocks");
 
 const BET_WINDOW_MS = 30_000;
-const MAX_IDLE_ROUNDS = 4;
+const MAX_IDLE_ROUNDS = 2;
 const DICE_FACES = ["⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
 const DICE_REVEAL_DELAY_MS = 3000;
 const DICE_REVEAL_TICK_MS = 350;

@@ -1,3 +1,26 @@
+const TEAM_STADIUMS = {
+  "Manchester United": "Old Trafford",
+  Liverpool: "Anfield",
+  Everton: "Hill Dickinson Stadium",
+  Arsenal: "Emirates",
+  Tottenham: "Tottenham Hotspur",
+  Chelsea: "Stamford Bridge",
+  "Aston Villa": "Villa Park",
+  Fulham: "Craven Cottage",
+  Sunderland: "Stadium of Light",
+  "Crystal Palace": "Selhurst Park",
+  Burnley: "Turf Moor",
+  Newcastle: "St James Park",
+  "Nottingham Forest": "City Ground",
+  "Leeds United": "Elland Road",
+  Wolverhampton: "Molineux",
+  "Man City": "Etihad",
+  "West Ham": "Olympic",
+  Bournemouth: "Vitality",
+  Brentford: "Brentford Community Stadium",
+  Brighton: "Falmer"
+};
+
 async function fetchMatches() {
   const [openRes, closedRes] = await Promise.all([
     fetch("/api/matches?status=open"),
@@ -48,6 +71,101 @@ function setupTabs() {
   });
 
   activate("manage");
+}
+
+function normalizeTeamName(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+function findStadiumByTeamName(teamName) {
+  const normalized = normalizeTeamName(teamName);
+  if (!normalized) {
+    return "";
+  }
+
+  for (const [team, stadium] of Object.entries(TEAM_STADIUMS)) {
+    if (normalizeTeamName(team) === normalized) {
+      return stadium;
+    }
+  }
+
+  return "";
+}
+
+function setupTeamStadiumAssist() {
+  const form = document.getElementById("create-form");
+  if (!form) {
+    return;
+  }
+
+  const homeTeamInput = form.querySelector('input[name="homeTeam"]');
+  const awayTeamInput = form.querySelector('input[name="awayTeam"]');
+  const stadiumInput = form.querySelector('input[name="stadium"]');
+  const teamDatalist = document.getElementById("team-options");
+  const stadiumDatalist = document.getElementById("stadium-options");
+  const stadiumHint = document.getElementById("stadium-hint");
+
+  if (!homeTeamInput || !awayTeamInput || !stadiumInput || !teamDatalist || !stadiumDatalist || !stadiumHint) {
+    return;
+  }
+
+  const teams = Object.keys(TEAM_STADIUMS);
+  const stadiums = Array.from(new Set(Object.values(TEAM_STADIUMS)));
+
+  teamDatalist.innerHTML = "";
+  teams.forEach((team) => {
+    const option = document.createElement("option");
+    option.value = team;
+    teamDatalist.appendChild(option);
+  });
+
+  stadiumDatalist.innerHTML = "";
+  stadiums.forEach((stadium) => {
+    const option = document.createElement("option");
+    option.value = stadium;
+    stadiumDatalist.appendChild(option);
+  });
+
+  function updateStadiumHint() {
+    const homeTeam = homeTeamInput.value;
+    const awayTeam = awayTeamInput.value;
+    const homeStadium = findStadiumByTeamName(homeTeam);
+    const awayStadium = findStadiumByTeamName(awayTeam);
+
+    if (homeStadium) {
+      stadiumHint.textContent = `Suggested stadium (${homeTeam.trim() || "home"}): ${homeStadium}`;
+      return;
+    }
+
+    if (awayStadium) {
+      stadiumHint.textContent = `Away team stadium (${awayTeam.trim() || "away"}): ${awayStadium}`;
+      return;
+    }
+
+    stadiumHint.textContent = "EPL quick list loaded: chọn team để hiện gợi ý sân.";
+  }
+
+  function maybeAutoFillFromHomeTeam() {
+    const suggested = findStadiumByTeamName(homeTeamInput.value);
+    if (!suggested) {
+      return;
+    }
+
+    if (!stadiumInput.value.trim()) {
+      stadiumInput.value = suggested;
+    }
+  }
+
+  homeTeamInput.addEventListener("input", () => {
+    maybeAutoFillFromHomeTeam();
+    updateStadiumHint();
+  });
+
+  awayTeamInput.addEventListener("input", updateStadiumHint);
+  updateStadiumHint();
 }
 
 
@@ -669,3 +787,4 @@ Promise.all([fetchMatches(), fetchUsers()]).catch((err) => {
 });
 
 setupTabs();
+setupTeamStadiumAssist();

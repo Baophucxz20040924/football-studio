@@ -34,16 +34,17 @@
         <form id="create-form" class="grid">
           <label>
             Home team
-            <input name="homeTeam" type="text" required />
+            <input name="homeTeam" type="text" list="team-options" required />
           </label>
           <label>
             Away team
-            <input name="awayTeam" type="text" required />
+            <input name="awayTeam" type="text" list="team-options" required />
           </label>
           <label>
             Stadium
-            <input name="stadium" type="text" />
+            <input name="stadium" type="text" list="stadium-options" />
           </label>
+          <p id="stadium-hint" class="card-meta full"></p>
           <label>
             Kickoff
             <input name="kickoff" type="datetime-local" required />
@@ -54,6 +55,8 @@
           </label>
           <button type="submit">Create</button>
         </form>
+        <datalist id="team-options"></datalist>
+        <datalist id="stadium-options"></datalist>
       </section>
 
       <section class="panel tab-page" data-page="manage">

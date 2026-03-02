@@ -99,7 +99,15 @@ npm run build:assets
 ## Luật chặt hỗ trợ
 
 - Tứ quý chặt `2` lẻ
-- 4 đôi thông chặt đôi `2`
+- 3 đôi thông trở lên chặt `2` (heo)
+- 3 đôi thông không còn dùng để cướp cái
+- 4 đôi thông chặt được: tứ quý, đôi `2`, và 3 đôi thông
+- Tứ quý chặt được: `2` lẻ, đôi `2`, và 3 đôi thông
+- Hỗ trợ chặt đè liên tiếp (tiền phạt nhân đôi theo chuỗi chặt)
+
+## Thắng ngay
+
+- Người chơi có tứ quý `2` sẽ thắng ngay khi chia bài
 
 ## Lưu ý
 

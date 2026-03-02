@@ -198,12 +198,36 @@ const canBeat = (currentCombo, nextCombo) => {
   const twoRank = rankPower('2')
   const isSingleTwo = currentCombo.type === 'single' && currentCombo.rankPower === twoRank
   const isPairTwo = currentCombo.type === 'pair' && currentCombo.rankPower === twoRank
+  const isThreeConsecutivePairs =
+    currentCombo.type === 'consecutivePairs' && currentCombo.length === 6
+  const isFourOrMoreConsecutivePairs =
+    nextCombo.type === 'consecutivePairs' && nextCombo.length >= 8
 
   if (isSingleTwo && nextCombo.type === 'fourOfKind') {
     return true
   }
 
-  if (isPairTwo && nextCombo.type === 'consecutivePairs' && nextCombo.length >= 8) {
+  if (isSingleTwo && nextCombo.type === 'consecutivePairs' && nextCombo.length >= 6) {
+    return true
+  }
+
+  if (isPairTwo && nextCombo.type === 'fourOfKind') {
+    return true
+  }
+
+  if (isPairTwo && isFourOrMoreConsecutivePairs) {
+    return true
+  }
+
+  if (isThreeConsecutivePairs && nextCombo.type === 'fourOfKind') {
+    return true
+  }
+
+  if (isThreeConsecutivePairs && isFourOrMoreConsecutivePairs) {
+    return true
+  }
+
+  if (currentCombo.type === 'fourOfKind' && isFourOrMoreConsecutivePairs) {
     return true
   }
 

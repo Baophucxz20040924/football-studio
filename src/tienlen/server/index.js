@@ -173,53 +173,25 @@ const nextIndex = (players, currentIndex) => {
 
 const rankPowerOf = (rank) => parseCard(`${rank}S`).rankPower
 
-const findThreeConsecutivePairsCards = (hand) => {
-  if (!Array.isArray(hand) || hand.length < 6) {
-    return null
-  }
+const findThreeSpadesHolderId = (room, hands) => {
+  return room.players.find((player) => (hands[player.id] || []).includes('3S'))?.id ?? null
+}
 
-  const groups = new Map()
-  for (const rawCard of sortCards(hand)) {
-    const card = parseCard(rawCard)
-    if (!groups.has(card.rankPower)) {
-      groups.set(card.rankPower, [])
-    }
-    groups.get(card.rankPower).push(rawCard)
-  }
-
+const findFourTwosWinnerId = (room, hands) => {
   const twoRank = rankPowerOf('2')
-  let runStart = null
-  let runLength = 0
 
-  for (let rank = 0; rank < twoRank; rank += 1) {
-    const cards = groups.get(rank) || []
-    if (cards.length >= 2) {
-      if (runStart === null) {
-        runStart = rank
-      }
-      runLength += 1
-      if (runLength >= 3) {
-        const chosen = []
-        for (let takeRank = rank - 2; takeRank <= rank; takeRank += 1) {
-          const pairCards = (groups.get(takeRank) || []).slice(0, 2)
-          if (pairCards.length < 2) {
-            return null
-          }
-          chosen.push(...pairCards)
-        }
-        return sortCards(chosen)
-      }
-    } else {
-      runStart = null
-      runLength = 0
+  for (const player of room.players) {
+    const hand = hands[player.id] || []
+    const twoCount = hand.reduce((count, rawCard) => {
+      return count + (parseCard(rawCard).rankPower === twoRank ? 1 : 0)
+    }, 0)
+
+    if (twoCount === 4) {
+      return player.id
     }
   }
 
   return null
-}
-
-const findThreeSpadesHolderId = (room, hands) => {
-  return room.players.find((player) => (hands[player.id] || []).includes('3S'))?.id ?? null
 }
 
 const findSmallestCardHolderId = (room, hands) => {
@@ -487,37 +459,121 @@ const processImmediateChopMoney = (room, newPlayerId, newCombo, prevTrick) => {
 
   const game = room.game
   const prevCombo = prevTrick.combo
+  const isThreeConsecutivePairs =
+    prevCombo?.type === 'consecutivePairs' && prevCombo.length === 6
+  const isFourOrMoreConsecutivePairs =
+    newCombo?.type === 'consecutivePairs' && newCombo.length >= 8
 
-  if (game.chopState && prevTrick.playerId === game.chopState.lastChopperId && newCombo.type === prevCombo.type) {
+  if (game.chopState && prevTrick.playerId === game.chopState.lastChopperId) {
+    if (game.chopState.fromId && game.chopState.toId && game.chopState.units > 0) {
+      transferMoney(
+        room,
+        game.chopState.toId,
+        game.chopState.fromId,
+        game.chopState.units,
+        'Hoàn tiền chặt trước đó',
+      )
+    }
+
     const units = game.chopState.units * 2
     transferMoney(room, game.chopState.lastChopperId, newPlayerId, units, 'Chặt đè')
     game.chopState = {
       units,
       lastChopperId: newPlayerId,
       type: newCombo.type,
+      fromId: game.chopState.lastChopperId,
+      toId: newPlayerId,
     }
     return
   }
 
   const singleTwoUnits = getSingleTwoChopUnits(prevCombo)
+  if (singleTwoUnits > 0 && newCombo.type === 'consecutivePairs' && newCombo.length >= 6) {
+    transferMoney(room, prevTrick.playerId, newPlayerId, singleTwoUnits, 'Chặt 2 bằng 3 đôi thông')
+    game.chopState = {
+      units: singleTwoUnits,
+      lastChopperId: newPlayerId,
+      type: newCombo.type,
+      fromId: prevTrick.playerId,
+      toId: newPlayerId,
+    }
+    return
+  }
+
   if (singleTwoUnits > 0 && newCombo.type === 'fourOfKind') {
     transferMoney(room, prevTrick.playerId, newPlayerId, singleTwoUnits, 'Chặt 2')
     game.chopState = {
       units: singleTwoUnits,
       lastChopperId: newPlayerId,
       type: newCombo.type,
+      fromId: prevTrick.playerId,
+      toId: newPlayerId,
     }
     return
   }
 
   const isPairTwo = prevCombo.type === 'pair' && prevCombo.rankPower === rankPowerOf('2')
-  if (isPairTwo && newCombo.type === 'consecutivePairs' && newCombo.length >= 8) {
+  if (isPairTwo && newCombo.type === 'fourOfKind') {
     const units = 10
-    transferMoney(room, prevTrick.playerId, newPlayerId, units, 'Chặt đôi 2 bằng 4 đôi thông')
+    transferMoney(room, prevTrick.playerId, newPlayerId, units, 'Tứ quý chặt đôi 2')
     game.chopState = {
       units,
       lastChopperId: newPlayerId,
       type: newCombo.type,
+      fromId: prevTrick.playerId,
+      toId: newPlayerId,
+    }
+    return
+  }
+
+  if (isPairTwo && isFourOrMoreConsecutivePairs) {
+    const units = 10
+    transferMoney(room, prevTrick.playerId, newPlayerId, units, '4 đôi thông chặt đôi 2')
+    game.chopState = {
+      units,
+      lastChopperId: newPlayerId,
+      type: newCombo.type,
+      fromId: prevTrick.playerId,
+      toId: newPlayerId,
+    }
+    return
+  }
+
+  if (isThreeConsecutivePairs && newCombo.type === 'fourOfKind') {
+    const units = 10
+    transferMoney(room, prevTrick.playerId, newPlayerId, units, 'Tứ quý chặt 3 đôi thông')
+    game.chopState = {
+      units,
+      lastChopperId: newPlayerId,
+      type: newCombo.type,
+      fromId: prevTrick.playerId,
+      toId: newPlayerId,
+    }
+    return
+  }
+
+  if (isThreeConsecutivePairs && isFourOrMoreConsecutivePairs) {
+    const units = 10
+    transferMoney(room, prevTrick.playerId, newPlayerId, units, '4 đôi thông chặt 3 đôi thông')
+    game.chopState = {
+      units,
+      lastChopperId: newPlayerId,
+      type: newCombo.type,
+      fromId: prevTrick.playerId,
+      toId: newPlayerId,
+    }
+    return
+  }
+
+  if (prevCombo.type === 'fourOfKind' && isFourOrMoreConsecutivePairs) {
+    const units = 8
+    transferMoney(room, prevTrick.playerId, newPlayerId, units, '4 đôi thông chặt tứ quý')
+    game.chopState = {
+      units,
+      lastChopperId: newPlayerId,
+      type: newCombo.type,
+      fromId: prevTrick.playerId,
+      toId: newPlayerId,
     }
   }
 }
@@ -526,13 +582,6 @@ const buildStateForPlayer = (room, playerId) => {
   const game = room.game
   const myHand = game?.hands?.[playerId] ?? []
   const isSpectator = !room.players.some((player) => player.id === playerId)
-  const canRobStarter =
-    !!game?.started &&
-    !game?.currentTrick &&
-    !!game?.starterRobbery &&
-    !game.starterRobbery.resolved &&
-    game.starterRobbery.eligibleIds.has(playerId) &&
-    !game.starterRobbery.declinedIds.has(playerId)
 
   return {
     roomCode: room.code,
@@ -558,7 +607,7 @@ const buildStateForPlayer = (room, playerId) => {
           winnerId: game.winnerId,
           roundResult: !game.started ? room.lastRoundResult ?? null : null,
           firstTurnPending: game.firstTurnPending,
-          canRobStarter,
+          canRobStarter: false,
           myHand,
           isSpectator,
           canStart: room.ownerId === playerId && room.players.length >= 2,
@@ -749,7 +798,7 @@ const scheduleAutoStartNextRound = (room) => {
 
     const { minBalance, movedPlayers } = enforceMinimumBalanceForRoom(room)
     if (movedPlayers.length > 0 && room.players.length < 2) {
-      const { formatPoints } = require('../discord/commands/utils');
+      const { formatPoints } = require('../../discord/commands/utils');
       room.infoMessage = `${movedPlayers.map((player) => player.name).join(', ')} không đủ ${formatPoints(minBalance)} điểm để tiếp tục. Cần ít nhất 2 người đủ điểm để tự động bắt đầu.`
       emitRoomState(room)
       return
@@ -795,19 +844,24 @@ const setupGame = (room, preRoundNotice = '') => {
     firstTurnPending: !room.previousWinnerId && !!threeSpadesHolderId,
     chopState: null,
     pendingLeavePenalties: [],
-    starterRobbery: {
-      eligibleIds: new Set(
-        room.players
-          .filter((player) => player.id !== starterId)
-          .filter((player) => !!findThreeConsecutivePairsCards(hands[player.id] || []))
-          .map((player) => player.id),
-      ),
-      declinedIds: new Set(),
-      resolved: false,
-    },
   }
 
   room.lastRoundResult = null
+
+  const instantWinnerId = findFourTwosWinnerId(room, hands)
+  if (instantWinnerId) {
+    const instantWinner = room.players.find((player) => player.id === instantWinnerId)
+    room.game.started = false
+    room.game.winnerId = instantWinnerId
+    room.previousWinnerId = instantWinnerId
+    settleEndGameMoney(room, instantWinnerId)
+    const promotedNames = promoteWaitingSpectators(room)
+    room.infoMessage = `${instantWinner?.name || 'Người chơi'} có tứ quý 2 và thắng ngay ván này!`
+    if (promotedNames.length > 0) {
+      room.infoMessage += ` ${promotedNames.join(', ')} sẽ vào vai người chơi ở ván kế tiếp.`
+    }
+    return
+  }
 
   const roundInfo = room.previousWinnerId
     ? `${room.players.find((player) => player.id === starterId)?.name || 'Người thắng'} đi trước ván mới.`
@@ -1019,7 +1073,7 @@ io.on('connection', (socket) => {
 
     const minBalance = getMinimumEntryBalance(parsedBet)
     if (dbUser.balance < minBalance) {
-      const { formatPoints } = require('../discord/commands/utils');
+      const { formatPoints } = require('../../discord/commands/utils');
       emitError(socket, `Không đủ điểm vào bàn. Cần tối thiểu ${formatPoints(minBalance)} điểm cho mức cược ${parsedBet}.`)
       return
     }
@@ -1084,7 +1138,7 @@ io.on('connection', (socket) => {
 
     const minBalance = getMinimumEntryBalance(room.betUnit)
     if (dbUser.balance < minBalance) {
-      const { formatPoints } = require('../discord/commands/utils');
+      const { formatPoints } = require('../../discord/commands/utils');
       emitError(socket, `Không đủ điểm vào bàn. Cần tối thiểu ${formatPoints(minBalance)} điểm cho mức cược ${room.betUnit}.`)
       return
     }
@@ -1127,10 +1181,10 @@ io.on('connection', (socket) => {
     const { minBalance, movedPlayers } = enforceMinimumBalanceForRoom(room)
     if (room.players.length < 2) {
       if (movedPlayers.length > 0) {
-        const { formatPoints } = require('../discord/commands/utils');
+        const { formatPoints } = require('../../discord/commands/utils');
         room.infoMessage = `${movedPlayers.map((player) => player.name).join(', ')} không đủ ${formatPoints(minBalance)} điểm nên chuyển sang khán giả.`
       }
-      const { formatPoints } = require('../discord/commands/utils');
+      const { formatPoints } = require('../../discord/commands/utils');
       emitError(socket, `Cần ít nhất 2 người có tối thiểu ${formatPoints(minBalance)} điểm để bắt đầu.`)
       emitRoomState(room)
       return
@@ -1214,9 +1268,6 @@ io.on('connection', (socket) => {
     }
     game.passes = new Set([...game.passes].filter((id) => id !== socket.id))
     game.firstTurnPending = false
-    if (game.starterRobbery && !game.starterRobbery.resolved) {
-      game.starterRobbery.resolved = true
-    }
 
     if (game.hands[socket.id].length === 0) {
       game.started = false
@@ -1245,90 +1296,8 @@ io.on('connection', (socket) => {
       return
     }
 
-    const game = room.game
-    const robbery = game.starterRobbery
-    if (!robbery || robbery.resolved) {
-      emitError(socket, 'Không còn quyền cướp cái ở thời điểm này.')
-      return
-    }
-
-    if (game.currentTrick) {
-      robbery.resolved = true
-      emitError(socket, 'Vòng đánh đã bắt đầu, không thể cướp cái.')
-      emitRoomState(room)
-      return
-    }
-
-    if (!robbery.eligibleIds.has(socket.id) || robbery.declinedIds.has(socket.id)) {
-      emitError(socket, 'Bạn không có quyền cướp cái.')
-      return
-    }
-
-    if (action !== 'claim' && action !== 'skip') {
-      emitError(socket, 'Lựa chọn cướp cái không hợp lệ.')
-      return
-    }
-
-    const currentPlayer = room.players.find((player) => player.id === socket.id)
-    if (!currentPlayer) {
-      emitError(socket, 'Không tìm thấy người chơi trong phòng.')
-      return
-    }
-
-    if (action === 'skip') {
-      robbery.declinedIds.add(socket.id)
-      const unresolved = [...robbery.eligibleIds].filter((id) => !robbery.declinedIds.has(id))
-      if (unresolved.length === 0) {
-        robbery.resolved = true
-      }
-      room.infoMessage = `${currentPlayer.name} chọn không cướp cái.`
-      emitRoomState(room)
-      return
-    }
-
-    const hand = game.hands[socket.id] || []
-    const robCards = findThreeConsecutivePairsCards(hand)
-    const combo = detectCombo(robCards || [])
-    if (!robCards || !combo || combo.type !== 'consecutivePairs' || combo.length !== 6) {
-      robbery.declinedIds.add(socket.id)
-      const unresolved = [...robbery.eligibleIds].filter((id) => !robbery.declinedIds.has(id))
-      if (unresolved.length === 0) {
-        robbery.resolved = true
-      }
-      emitError(socket, 'Không còn đủ 3 đôi thông để cướp cái.')
-      emitRoomState(room)
-      return
-    }
-
-    game.turnIndex = room.players.findIndex((player) => player.id === socket.id)
-    game.hands[socket.id] = removeCardsFromHand(hand, robCards)
-    game.currentTrick = {
-      playerId: socket.id,
-      cards: robCards,
-      combo,
-    }
-    game.passes = new Set()
-    game.firstTurnPending = false
-    robbery.resolved = true
-    room.infoMessage = `${currentPlayer.name} cướp cái bằng 3 đôi thông.`
-
-    if (game.hands[socket.id].length === 0) {
-      game.started = false
-      game.winnerId = socket.id
-      room.previousWinnerId = socket.id
-      settleEndGameMoney(room, socket.id)
-      const promotedNames = promoteWaitingSpectators(room)
-      room.infoMessage = `${currentPlayer.name} đã thắng ván này!`
-      if (promotedNames.length > 0) {
-        room.infoMessage += ` ${promotedNames.join(', ')} sẽ vào vai người chơi ở ván kế tiếp.`
-      }
-      emitRoomState(room)
-      scheduleAutoStartNextRound(room)
-      return
-    }
-
-    advanceTurnAfterPlay(room)
-    emitRoomState(room)
+    void action
+    emitError(socket, 'Tính năng cướp cái đã được tắt.')
   })
 
   socket.on('passTurn', ({ roomCode }) => {

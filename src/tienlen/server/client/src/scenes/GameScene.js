@@ -29,7 +29,6 @@ export class GameScene extends Phaser.Scene {
     this.countTexts = {}
     this.turnRings = {}
     this.backStacks = {}
-    this.robStarterPromptSent = false
   }
 
   create() {
@@ -306,13 +305,6 @@ export class GameScene extends Phaser.Scene {
     this.canStart = !!state.canStart
     this.started = !!state.started
 
-    if (this.started && !wasStarted) {
-      this.robStarterPromptSent = false
-    }
-    if (!this.started) {
-      this.robStarterPromptSent = false
-    }
-
     const myCards = state.hands?.[this.mySeat] || []
     this.hand.setCards(myCards, this.started && this.currentTurn === this.mySeat)
 
@@ -342,14 +334,6 @@ export class GameScene extends Phaser.Scene {
 
     this.refreshSeatUI(state.handsCount || {})
     this.refreshControlState()
-
-    if (this.started && state.canRobStarter && !this.robStarterPromptSent) {
-      this.robStarterPromptSent = true
-      this.time.delayedCall(50, () => {
-        const shouldRob = window.confirm('Bạn có 3 đôi thông. Bạn có muốn cướp cái không?')
-        socketEvents.starterDecision(shouldRob ? 'claim' : 'skip')
-      })
-    }
   }
 
   refreshSeatUI(handsCount = {}) {

@@ -14,4 +14,7 @@ const AviatorBetSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+AviatorBetSchema.index({ status: 1, createdAt: -1 });
+AviatorBetSchema.index({ userId: 1, createdAt: -1 });
+
 module.exports = mongoose.model("AviatorBet", AviatorBetSchema);

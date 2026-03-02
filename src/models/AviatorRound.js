@@ -7,4 +7,6 @@ const AviatorRoundSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+AviatorRoundSchema.index({ createdAt: -1 });
+
 module.exports = mongoose.model("AviatorRound", AviatorRoundSchema);

@@ -39,4 +39,8 @@ const MatchSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+MatchSchema.index({ status: 1, kickoff: 1 });
+MatchSchema.index({ status: 1, betLocked: 1, kickoff: 1 });
+MatchSchema.index({ createdAt: -1 });
+
 module.exports = mongoose.model("Match", MatchSchema);

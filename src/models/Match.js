@@ -19,6 +19,7 @@ const GoalSchema = new mongoose.Schema(
 
 const MatchSchema = new mongoose.Schema(
   {
+    espnEventId: { type: String, index: true, unique: true, sparse: true },
     matchCode: { type: Number, unique: true, index: true },
     homeTeam: { type: String, required: true },
     awayTeam: { type: String, required: true },

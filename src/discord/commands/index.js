@@ -29,10 +29,63 @@ function isIgnorableInteractionError(error) {
   return error?.code === 10062 || error?.code === 40060;
 }
 
+function isRetryableInteractionError(error) {
+  const status = Number(error?.status);
+  if (Number.isFinite(status) && status >= 500) {
+    return true;
+  }
+
+  const code = String(error?.code || "");
+  return code === "ECONNRESET" || code === "ETIMEDOUT" || code === "UND_ERR_CONNECT_TIMEOUT";
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function withInteractionRetry(action) {
+  let lastError;
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await action();
+    } catch (error) {
+      lastError = error;
+      if (!isRetryableInteractionError(error) || attempt === 2) {
+        throw error;
+      }
+
+      await wait(300 * (attempt + 1));
+    }
+  }
+
+  throw lastError;
+}
+
+function wrapInteractionResponseMethods(interaction) {
+  if (interaction.__responseRetryWrapped) {
+    return;
+  }
+
+  const methodNames = ["reply", "followUp", "editReply", "deferReply", "update", "deferUpdate"];
+  for (const methodName of methodNames) {
+    if (typeof interaction[methodName] !== "function") {
+      continue;
+    }
+
+    const originalMethod = interaction[methodName].bind(interaction);
+    interaction[methodName] = (...args) => withInteractionRetry(() => originalMethod(...args));
+  }
+
+  interaction.__responseRetryWrapped = true;
+}
+
 async function handleInteraction(interaction) {
   if (!interaction.isChatInputCommand()) {
     return;
   }
+
+  wrapInteractionResponseMethods(interaction);
 
   const command = commands.find((cmd) => cmd.data.name === interaction.commandName);
   if (!command) {
@@ -43,6 +96,15 @@ async function handleInteraction(interaction) {
     await command.execute(interaction);
   } catch (err) {
     if (isIgnorableInteractionError(err)) {
+      return;
+    }
+
+     if (isRetryableInteractionError(err)) {
+      console.warn("Discord API temporary failure while handling interaction", {
+        command: interaction.commandName,
+        status: err?.status,
+        code: err?.code
+      });
       return;
     }
 

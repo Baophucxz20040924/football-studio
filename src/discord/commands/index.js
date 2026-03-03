@@ -1,3 +1,5 @@
+const { MessageFlags } = require("discord.js");
+
 const commands = [
   require("./matches"),
   require("./bet"),
@@ -43,6 +45,23 @@ function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function normalizeInteractionResponseOptions(options) {
+  if (!options || typeof options !== "object" || Array.isArray(options)) {
+    return options;
+  }
+
+  if (options.ephemeral === true) {
+    const normalized = { ...options };
+    delete normalized.ephemeral;
+
+    const currentFlags = Number(normalized.flags ?? 0);
+    normalized.flags = (Number.isFinite(currentFlags) ? currentFlags : 0) | MessageFlags.Ephemeral;
+    return normalized;
+  }
+
+  return options;
+}
+
 async function withInteractionRetry(action) {
   let lastError;
 
@@ -74,7 +93,13 @@ function wrapInteractionResponseMethods(interaction) {
     }
 
     const originalMethod = interaction[methodName].bind(interaction);
-    interaction[methodName] = (...args) => withInteractionRetry(() => originalMethod(...args));
+    interaction[methodName] = (...args) => {
+      const normalizedArgs = [...args];
+      if (normalizedArgs.length > 0) {
+        normalizedArgs[0] = normalizeInteractionResponseOptions(normalizedArgs[0]);
+      }
+      return withInteractionRetry(() => originalMethod(...normalizedArgs));
+    };
   }
 
   interaction.__responseRetryWrapped = true;

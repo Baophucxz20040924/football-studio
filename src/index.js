@@ -1835,7 +1835,7 @@ client.on("guildCreate", async (guild) => {
   await registerGuildCommands(guild.id);
 });
 
-client.once("ready", () => {
+client.once("clientReady", () => {
   console.log(`Bot ready as ${client.user.tag}`);
   const guilds = client.guilds.cache.map((guild) => guild.id);
   guilds.forEach((guildId) => {

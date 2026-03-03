@@ -37,7 +37,15 @@ sudo systemctl status ssh
 git clone <REPO_URL> football-crawler
 cd football-crawler
 npm install
+npm install --prefix src/tienlen/server
+npm install --prefix src/tienlen/server/client
 ```
+
+Why this is needed:
+
+- The root `npm install` only installs root dependencies.
+- Tien Len server/client are separate packages with their own `package.json`.
+- Without client dependencies, build can fail with `ERR_MODULE_NOT_FOUND: Cannot find package 'sharp'`.
 
 ## 3) Create .env
 
@@ -73,10 +81,31 @@ npm run build:tienlen-client
 
 After this, you can run services without rebuilding frontend each restart.
 
+### Troubleshooting: `Cannot find package 'sharp'`
+
+If `npm start` fails at `build-spritesheet.mjs` with missing `sharp`, run:
+
+```bash
+npm install --prefix src/tienlen/server/client
+npm run build:tienlen-client
+```
+
+Then start again:
+
+```bash
+npm start
+```
+
 ## 5) Run with PM2 (auto restart)
+
+Install PM2 first (if `pm2` command is missing):
 
 ```bash
 sudo npm i -g pm2
+pm2 -v
+```
+
+```bash
 pm2 start npm --name football-bot -- run start:no-build
 pm2 save
 pm2 startup

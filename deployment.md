@@ -12,6 +12,25 @@ node -v
 npm -v
 ```
 
+### If apt asks about `/etc/ssh/sshd_config` (openssh-server update)
+
+During `apt upgrade`, you may see a prompt like:
+
+`What do you want to do about modified configuration file sshd_config?`
+
+For remote VPS safety, choose:
+
+- `keep the local version currently installed`
+
+This keeps your current SSH settings and avoids accidentally losing access.
+
+After upgrade, optionally verify SSH config and service:
+
+```bash
+sudo sshd -t
+sudo systemctl status ssh
+```
+
 ## 2) Get the source code
 
 ```bash
@@ -25,12 +44,19 @@ npm install
 Create a `.env` file based on `.env.example` and fill in the values:
 
 ```
-DISCORD_TOKEN=...
-CLIENT_ID=...
-GUILD_ID=...        # optional, for guild-only commands
-MONGODB_URI=...     # MongoDB Atlas URI
-STARTING_BALANCE=1000
-PORT=3000
+DISCORD_TOKEN=
+CLIENT_ID=
+GUILD_ID=
+MONGODB_URI=
+PORT=
+STARTING_BALANCE=
+PUBLIC_BASE_URL=
+AVIATOR_TOKEN_SECRET=
+AVIATOR_HOUSE_EDGE=
+TIENLEN_TOKEN_SECRET=
+TIENLEN_TOKEN_TTL_MS=
+DISPLAY_LOCALE=
+DISPLAY_TIME_ZONE=
 ```
 
 ## 4) Deploy slash commands

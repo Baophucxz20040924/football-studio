@@ -135,3 +135,9 @@ Admin panel: `http://<VPS_IP>:3000/admin`
 ## Optional: Domain + HTTPS
 
 If you want to use a domain with HTTPS, set up Nginx as a reverse proxy and use Certbot for SSL.
+
+
+If you want to restart bot and update env:
+```bash
+pm2 restart football-bot --update-env
+```

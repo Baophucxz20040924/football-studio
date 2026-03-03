@@ -8,7 +8,8 @@ module.exports = {
   async execute(interaction) {
     const description = [
       "**Lệnh cơ bản**",
-      "\u26bd **/matches** - Danh sách trận đang mở (có mã trận)",
+        "⚽ **/football** - Danh sách trận bóng đá đang mở (có mã trận)",
+        "🏀 **/nba** - Danh sách trận NBA đang mở (có mã trận)",
       "\ud83c\udfaf **/bet** - Đặt cược (match_code, pick_key, amount)",
       "\ud83d\udcb0 **/balance** - Xem số dư điểm của bạn",
       "\ud83d\udcd3 **/bets** - Xem lịch sử đặt cược",
@@ -19,7 +20,7 @@ module.exports = {
       "\u2764\ufe0f **/donate** - Buy me a coffee",
       "",
       "**Trò chơi casino**",
-      "\u26bd **/football** - Football Studio (Home/Away/Draw)",
+        "⚽ **/fb** - Football Studio (Home/Away/Draw)",
       "\ud83c\udfb2 **/bcr** - Baccarat (Player/Banker/Tie)",
       "🃏 **/bj** - Blackjack (đấu với dealer)",
       "🎯 **/tx** - Tài xỉu (tài/xỉu/chẵn/lẻ/số)",

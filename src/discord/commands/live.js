@@ -32,15 +32,22 @@ module.exports = {
 
     const description = matches
       .map((match) => {
+        const sport = match.sport === "basketball" ? "basketball" : "football";
+        const sportLabel = sport === "basketball" ? "🏀 NBA" : "⚽ Football";
         const score = `${match.scoreHome ?? 0}-${match.scoreAway ?? 0}`;
-        const corner = `Corner: ${match.homeTeam}(${match.cornerHome ?? 0}) - ${match.awayTeam}(${match.cornerAway ?? 0})`;
-        const goals = formatGoals(match.goals);
-        return [
-          `**${match.homeTeam} vs ${match.awayTeam}** \ud83c\udfdf\ufe0f`,
-          `Score: ${score} \ud83d\udd25`,
-          corner,
-          goals
-        ].join("\n");
+        const lines = [
+          `**${match.homeTeam} vs ${match.awayTeam}**`,
+          `Sport: ${sportLabel}`,
+          `Score: ${score} 🔥`
+        ];
+
+        if (sport === "football") {
+          const corner = `Corner: ${match.homeTeam}(${match.cornerHome ?? 0}) - ${match.awayTeam}(${match.cornerAway ?? 0})`;
+          const goals = formatGoals(match.goals);
+          lines.push(corner, goals);
+        }
+
+        return lines.join("\n");
       })
       .join("\n\n");
 

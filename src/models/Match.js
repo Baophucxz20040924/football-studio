@@ -20,6 +20,7 @@ const GoalSchema = new mongoose.Schema(
 const MatchSchema = new mongoose.Schema(
   {
     espnEventId: { type: String, index: true, unique: true, sparse: true },
+    sport: { type: String, enum: ["football", "basketball"], default: "football", index: true },
     matchCode: { type: Number, unique: true, index: true },
     homeTeam: { type: String, required: true },
     awayTeam: { type: String, required: true },
@@ -42,6 +43,7 @@ const MatchSchema = new mongoose.Schema(
 );
 
 MatchSchema.index({ status: 1, kickoff: 1 });
+MatchSchema.index({ sport: 1, status: 1, kickoff: 1 });
 MatchSchema.index({ status: 1, betLocked: 1, kickoff: 1 });
 MatchSchema.index({ createdAt: -1 });
 

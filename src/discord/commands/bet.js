@@ -81,7 +81,7 @@ module.exports = {
     if (!odd) {
       const embed = buildEmbed({
         title: "Invalid pick ❗",
-        description: `Available odds: ${formatOdds(match.odds)} ⚽`,
+        description: `Available odds: ${formatOdds(match.odds)}`,
         color: 0xf36c5c
       });
       return interaction.reply({ embeds: [embed], ephemeral: true });
@@ -135,7 +135,7 @@ module.exports = {
     });
 
     const embed = buildEmbed({
-      title: "Bet placed ⚽",
+      title: "Bet placed 🎯",
       description: [
         `Match: **${match.homeTeam} vs ${match.awayTeam}**`,
         `Pick: **${pickKey}** (x${odd.multiplier})`,

@@ -2,6 +2,44 @@ const { SlashCommandBuilder } = require("discord.js");
 const Match = require("../../models/Match");
 const { formatOdds, formatKickoff, buildEmbed, primeEmojiCaches, findEmojiByName } = require("./utils");
 
+const EMBED_DESCRIPTION_MAX = 4096;
+const EMBEDS_PER_MESSAGE_MAX = 10;
+
+function chunkDescriptions(items, separator = "\n\n", maxLength = EMBED_DESCRIPTION_MAX) {
+  const chunks = [];
+  let current = "";
+
+  for (const item of items) {
+    const candidate = current ? `${current}${separator}${item}` : item;
+    if (candidate.length <= maxLength) {
+      current = candidate;
+      continue;
+    }
+
+    if (current) {
+      chunks.push(current);
+      current = "";
+    }
+
+    if (item.length <= maxLength) {
+      current = item;
+      continue;
+    }
+
+    let offset = 0;
+    while (offset < item.length) {
+      chunks.push(item.slice(offset, offset + maxLength));
+      offset += maxLength;
+    }
+  }
+
+  if (current) {
+    chunks.push(current);
+  }
+
+  return chunks;
+}
+
 const FALLBACK_TEAM_EMOJI = "⚽";
 const TEAM_EMOJI_BY_NAME = {
   Arsenal: "Arsenal_FC",
@@ -50,12 +88,13 @@ function resolveTeamEmoji(guild, teamName) {
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName("matches")
-    .setDescription("List open matches"),
+    .setName("football")
+    .setDescription("List open football matches"),
   async execute(interaction) {
     await primeEmojiCaches(interaction.guild).catch(() => null);
 
     const matches = await Match.find({
+      sport: "football",
       status: "open",
       betLocked: { $ne: true },
       kickoff: { $gt: new Date() }
@@ -69,7 +108,7 @@ module.exports = {
       return interaction.reply({ embeds: [embed], ephemeral: true });
     }
 
-    const description = matches
+    const blocks = matches
       .map((m) => {
         const kickoff = formatKickoff(m.kickoff);
         const oddsList = Array.isArray(m.odds) ? m.odds : [];
@@ -88,14 +127,23 @@ module.exports = {
           `Odds T/X: ${totalsText}`
         ].join("\n");
       })
-      .join("\n\n");
+      ;
 
-    const embed = buildEmbed({
-      title: "Open matches \u26bd",
+    const descriptions = chunkDescriptions(blocks);
+    const embeds = descriptions.map((description, index) => buildEmbed({
+      title: descriptions.length > 1
+        ? `Open football matches ⚽ (${index + 1}/${descriptions.length})`
+        : "Open football matches ⚽",
       description,
       color: 0xf6c244
-    });
+    }));
 
-    return interaction.reply({ embeds: [embed] });
+    await interaction.reply({ embeds: embeds.slice(0, EMBEDS_PER_MESSAGE_MAX) });
+
+    for (let i = EMBEDS_PER_MESSAGE_MAX; i < embeds.length; i += EMBEDS_PER_MESSAGE_MAX) {
+      await interaction.followUp({ embeds: embeds.slice(i, i + EMBEDS_PER_MESSAGE_MAX) });
+    }
+
+    return null;
   }
 };

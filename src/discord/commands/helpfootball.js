@@ -8,6 +8,7 @@ module.exports = {
   async execute(interaction) {
     const description = [
       "**⚽ FOOTBALL STUDIO - Luật chơi**",
+      "Lệnh chơi: `/fb`",
       "",
       "**Mục tiêu:**",
       "Dự đoán kết quả trận đấu: Home (Nhà), Away (Khách) hay Draw (Hòa).",

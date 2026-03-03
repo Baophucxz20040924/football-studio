@@ -36,6 +36,19 @@ const ESPN_EPL_PREMATCH_SYNC_NEAR_INTERVAL_MS = Number(process.env.ESPN_EPL_PREM
 const ESPN_EPL_PREMATCH_NEAR_WINDOW_MS = Number(process.env.ESPN_EPL_PREMATCH_NEAR_WINDOW_MS || 2 * 60 * 60_000);
 const ESPN_EPL_SYNC_DAYS_AHEAD = Number(process.env.ESPN_EPL_SYNC_DAYS_AHEAD || 7);
 const ESPN_EPL_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/scoreboard";
+const ESPN_NBA_AUTO_SYNC_ENABLED = process.env.ESPN_NBA_AUTO_SYNC_ENABLED !== "false";
+const ESPN_NBA_AUTO_CLOSE_ENABLED = process.env.ESPN_NBA_AUTO_CLOSE_ENABLED !== "false";
+const ESPN_NBA_CREATE_SYNC_INTERVAL_MS = Number(process.env.ESPN_NBA_CREATE_SYNC_INTERVAL_MS || 30 * 60_000);
+const ESPN_NBA_LIVE_SYNC_INTERVAL_MS = Number(process.env.ESPN_NBA_LIVE_SYNC_INTERVAL_MS || 2 * 60_000);
+const ESPN_NBA_PREMATCH_SYNC_CHECK_INTERVAL_MS = Number(process.env.ESPN_NBA_PREMATCH_SYNC_CHECK_INTERVAL_MS || 10 * 60_000);
+const ESPN_NBA_PREMATCH_SYNC_FAR_INTERVAL_MS = Number(process.env.ESPN_NBA_PREMATCH_SYNC_FAR_INTERVAL_MS || 2 * 60 * 60_000);
+const ESPN_NBA_PREMATCH_SYNC_NEAR_INTERVAL_MS = Number(process.env.ESPN_NBA_PREMATCH_SYNC_NEAR_INTERVAL_MS || 60 * 60_000);
+const ESPN_NBA_PREMATCH_NEAR_WINDOW_MS = Number(process.env.ESPN_NBA_PREMATCH_NEAR_WINDOW_MS || 2 * 60 * 60_000);
+const ESPN_NBA_SYNC_DAYS_AHEAD = Number(process.env.ESPN_NBA_SYNC_DAYS_AHEAD || 7);
+const ESPN_NBA_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard";
+const MATCH_HISTORY_RETENTION_DAYS = Number(process.env.MATCH_HISTORY_RETENTION_DAYS || 45);
+const BET_HISTORY_RETENTION_DAYS = Number(process.env.BET_HISTORY_RETENTION_DAYS || 90);
+const DATA_CLEANUP_INTERVAL_MS = Number(process.env.DATA_CLEANUP_INTERVAL_MS || 12 * 60 * 60_000);
 const AVIATOR_TICK_MS = 100;
 const AVIATOR_K = 0.12;
 const AVIATOR_HOUSE_EDGE = Number(process.env.AVIATOR_HOUSE_EDGE || 0.01);
@@ -63,6 +76,13 @@ let eplLiveSyncIntervalId = null;
 let eplCreateSyncInProgress = false;
 let eplPrematchSyncInProgress = false;
 let eplLiveSyncInProgress = false;
+let nbaCreateSyncIntervalId = null;
+let nbaPrematchSyncIntervalId = null;
+let nbaLiveSyncIntervalId = null;
+let nbaCreateSyncInProgress = false;
+let nbaPrematchSyncInProgress = false;
+let nbaLiveSyncInProgress = false;
+let dataCleanupIntervalId = null;
 
 function parseKickoffInput(value) {
   if (value instanceof Date) {
@@ -171,6 +191,36 @@ function getEplDateRangeTokenWithOffsets(startOffsetDays, endOffsetDays) {
   start.setUTCDate(start.getUTCDate() + startOffsetDays);
   end.setUTCDate(end.getUTCDate() + endOffsetDays);
   return `${toEspnDateToken(start)}-${toEspnDateToken(end)}`;
+}
+
+function getNbaDateRangeToken(daysAhead) {
+  const start = new Date();
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + Math.max(0, daysAhead));
+  return `${toEspnDateToken(start)}-${toEspnDateToken(end)}`;
+}
+
+function getNbaDateRangeTokenWithOffsets(startOffsetDays, endOffsetDays) {
+  const start = new Date();
+  const end = new Date();
+  start.setUTCDate(start.getUTCDate() + startOffsetDays);
+  end.setUTCDate(end.getUTCDate() + endOffsetDays);
+  return `${toEspnDateToken(start)}-${toEspnDateToken(end)}`;
+}
+
+async function fetchScoreboardEvents(url, dates) {
+  const response = await fetch(`${url}?dates=${dates}`, {
+    headers: {
+      Accept: "application/json"
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`ESPN scoreboard failed with HTTP ${response.status}`);
+  }
+
+  const payload = await response.json();
+  return Array.isArray(payload?.events) ? payload.events : [];
 }
 
 function getCompetitionFromEvent(event) {
@@ -383,7 +433,36 @@ function extractEplOdds(competition) {
   return Array.from(dedupedByKey.values());
 }
 
-function buildMatchFromEspnEvent(event) {
+function extractNbaOdds(competition) {
+  const odds = Array.isArray(competition?.odds) ? competition.odds[0] : null;
+  const moneyline = odds?.moneyline || {};
+
+  const homeAmerican = moneyline?.home?.close?.odds ?? moneyline?.home?.open?.odds;
+  const awayAmerican = moneyline?.away?.close?.odds ?? moneyline?.away?.open?.odds;
+
+  const mapped = [
+    { key: "home", multiplier: parseAmericanOddsToMultiplier(homeAmerican) },
+    { key: "away", multiplier: parseAmericanOddsToMultiplier(awayAmerican) }
+  ].filter((item) => Number.isFinite(item.multiplier));
+
+  const totalMarket = selectBalancedTotalOdds(odds);
+  if (totalMarket) {
+    const line = formatTotalLineForKey(totalMarket.line);
+    if (line) {
+      mapped.push({ key: `big(${line})`, multiplier: totalMarket.overMultiplier });
+      mapped.push({ key: `small(${line})`, multiplier: totalMarket.underMultiplier });
+    }
+  }
+
+  const dedupedByKey = new Map();
+  for (const item of mapped) {
+    dedupedByKey.set(item.key, item);
+  }
+
+  return Array.from(dedupedByKey.values());
+}
+
+function buildMatchFromEspnEvent(event, { sport, oddsExtractor, eventIdPrefix = "" }) {
   const competition = getCompetitionFromEvent(event);
   if (!competition) {
     return null;
@@ -411,14 +490,20 @@ function buildMatchFromEspnEvent(event) {
     && Number.isFinite(scoreAway)
     && (state === "in" || state === "post");
 
+  const rawEventId = String(event?.id || competition?.id || "").trim();
+  if (!rawEventId) {
+    return null;
+  }
+
   return {
-    espnEventId: String(event?.id || competition?.id || "").trim(),
+    espnEventId: eventIdPrefix ? `${eventIdPrefix}:${rawEventId}` : rawEventId,
+    sport,
     state: String(state || "").toLowerCase(),
     homeTeam,
     awayTeam,
     stadium: competition?.venue?.fullName || competition?.venue?.displayName || event?.venue?.displayName || "",
     kickoff,
-    odds: extractEplOdds(competition),
+    odds: typeof oddsExtractor === "function" ? oddsExtractor(competition) : [],
     scoreHome,
     scoreAway,
     hasLiveScore
@@ -426,19 +511,26 @@ function buildMatchFromEspnEvent(event) {
 }
 
 async function fetchEplScoreboardEvents(dates) {
-  const url = `${ESPN_EPL_SCOREBOARD_URL}?dates=${dates}`;
-  const response = await fetch(url, {
-    headers: {
-      Accept: "application/json"
-    }
+  return fetchScoreboardEvents(ESPN_EPL_SCOREBOARD_URL, dates);
+}
+
+function buildEplMatchFromEspnEvent(event) {
+  return buildMatchFromEspnEvent(event, {
+    sport: "football",
+    oddsExtractor: extractEplOdds
   });
+}
 
-  if (!response.ok) {
-    throw new Error(`ESPN scoreboard failed with HTTP ${response.status}`);
-  }
+async function fetchNbaScoreboardEvents(dates) {
+  return fetchScoreboardEvents(ESPN_NBA_SCOREBOARD_URL, dates);
+}
 
-  const payload = await response.json();
-  return Array.isArray(payload?.events) ? payload.events : [];
+function buildNbaMatchFromEspnEvent(event) {
+  return buildMatchFromEspnEvent(event, {
+    sport: "basketball",
+    oddsExtractor: extractNbaOdds,
+    eventIdPrefix: "nba"
+  });
 }
 
 function deriveWinnerKeysByScore(scoreHome, scoreAway, odds = []) {
@@ -447,18 +539,20 @@ function deriveWinnerKeysByScore(scoreHome, scoreAway, odds = []) {
   }
 
   const winnerKeys = [];
-  const totalGoals = scoreHome + scoreAway;
+  const totalPoints = scoreHome + scoreAway;
+  const oddsList = Array.isArray(odds) ? odds : [];
+  const hasDrawOdd = oddsList.some((odd) => odd?.key === "draw");
 
   if (scoreHome > scoreAway) {
     winnerKeys.push("home");
   } else if (scoreHome < scoreAway) {
     winnerKeys.push("away");
-  } else {
+  } else if (hasDrawOdd) {
     winnerKeys.push("draw");
   }
 
   const totalLines = new Set();
-  for (const odd of Array.isArray(odds) ? odds : []) {
+  for (const odd of oddsList) {
     const line = parseTotalLineFromPickKey(odd?.key);
     if (Number.isFinite(line)) {
       totalLines.add(line);
@@ -471,7 +565,7 @@ function deriveWinnerKeysByScore(scoreHome, scoreAway, odds = []) {
       continue;
     }
 
-    if (totalGoals > line) {
+    if (totalPoints > line) {
       winnerKeys.push(`big(${normalized})`);
     } else {
       winnerKeys.push(`small(${normalized})`);
@@ -536,16 +630,17 @@ async function syncEplCreateMatches() {
     let updated = 0;
 
     for (const event of events) {
-      const incoming = buildMatchFromEspnEvent(event);
+      const incoming = buildEplMatchFromEspnEvent(event);
       if (!incoming?.espnEventId) {
         continue;
       }
 
-      const existing = await Match.findOne({ espnEventId: incoming.espnEventId });
+      const existing = await Match.findOne({ espnEventId: incoming.espnEventId, sport: "football" });
       if (!existing) {
         const matchCode = await generateMatchCode();
         await Match.create({
           espnEventId: incoming.espnEventId,
+          sport: "football",
           matchCode,
           homeTeam: incoming.homeTeam,
           awayTeam: incoming.awayTeam,
@@ -615,6 +710,7 @@ async function syncEplPrematchOdds() {
   try {
     const now = new Date();
     const candidates = await Match.find({
+      sport: "football",
       status: "open",
       espnEventId: { $exists: true, $ne: "" },
       kickoff: { $gt: now }
@@ -629,7 +725,7 @@ async function syncEplPrematchOdds() {
     const incomingByEventId = new Map();
 
     for (const event of events) {
-      const incoming = buildMatchFromEspnEvent(event);
+      const incoming = buildEplMatchFromEspnEvent(event);
       if (incoming?.espnEventId) {
         incomingByEventId.set(incoming.espnEventId, incoming);
       }
@@ -699,6 +795,7 @@ async function syncEplLiveOddsAndScores() {
   try {
     const now = new Date();
     const candidates = await Match.find({
+      sport: "football",
       status: "open",
       espnEventId: { $exists: true, $ne: "" },
       kickoff: { $lte: now }
@@ -713,7 +810,7 @@ async function syncEplLiveOddsAndScores() {
     const incomingByEventId = new Map();
 
     for (const event of events) {
-      const incoming = buildMatchFromEspnEvent(event);
+      const incoming = buildEplMatchFromEspnEvent(event);
       if (incoming?.espnEventId) {
         incomingByEventId.set(incoming.espnEventId, incoming);
       }
@@ -834,6 +931,325 @@ function startEplPrematchSyncScheduler() {
   }, ESPN_EPL_PREMATCH_SYNC_CHECK_INTERVAL_MS);
 }
 
+async function syncNbaCreateMatches() {
+  if (!ESPN_NBA_AUTO_SYNC_ENABLED) {
+    return;
+  }
+
+  if (nbaCreateSyncInProgress) {
+    return;
+  }
+
+  nbaCreateSyncInProgress = true;
+
+  try {
+    const dates = getNbaDateRangeToken(ESPN_NBA_SYNC_DAYS_AHEAD);
+    const events = await fetchNbaScoreboardEvents(dates);
+    let created = 0;
+    let updated = 0;
+
+    for (const event of events) {
+      const incoming = buildNbaMatchFromEspnEvent(event);
+      if (!incoming?.espnEventId) {
+        continue;
+      }
+
+      const existing = await Match.findOne({ espnEventId: incoming.espnEventId, sport: "basketball" });
+      if (!existing) {
+        const matchCode = await generateMatchCode();
+        await Match.create({
+          espnEventId: incoming.espnEventId,
+          sport: "basketball",
+          matchCode,
+          homeTeam: incoming.homeTeam,
+          awayTeam: incoming.awayTeam,
+          stadium: incoming.stadium,
+          kickoff: incoming.kickoff,
+          scoreHome: incoming.hasLiveScore ? incoming.scoreHome : 0,
+          scoreAway: incoming.hasLiveScore ? incoming.scoreAway : 0,
+          odds: incoming.odds,
+          status: "open"
+        });
+        created += 1;
+        continue;
+      }
+
+      if (existing.status !== "open") {
+        continue;
+      }
+
+      let changed = false;
+
+      if (existing.homeTeam !== incoming.homeTeam) {
+        existing.homeTeam = incoming.homeTeam;
+        changed = true;
+      }
+
+      if (existing.awayTeam !== incoming.awayTeam) {
+        existing.awayTeam = incoming.awayTeam;
+        changed = true;
+      }
+
+      const incomingStadium = incoming.stadium || "";
+      if ((existing.stadium || "") !== incomingStadium) {
+        existing.stadium = incomingStadium;
+        changed = true;
+      }
+
+      if (new Date(existing.kickoff).getTime() !== incoming.kickoff.getTime()) {
+        existing.kickoff = incoming.kickoff;
+        changed = true;
+      }
+
+      if (changed) {
+        await existing.save();
+        updated += 1;
+      }
+    }
+
+    if (created > 0 || updated > 0) {
+      console.log(`NBA create sync complete: created ${created} match(es), updated ${updated} match(es).`);
+    }
+  } finally {
+    nbaCreateSyncInProgress = false;
+  }
+}
+
+async function syncNbaPrematchOdds() {
+  if (!ESPN_NBA_AUTO_SYNC_ENABLED) {
+    return;
+  }
+
+  if (nbaPrematchSyncInProgress) {
+    return;
+  }
+
+  nbaPrematchSyncInProgress = true;
+
+  try {
+    const now = new Date();
+    const candidates = await Match.find({
+      sport: "basketball",
+      status: "open",
+      espnEventId: { $exists: true, $ne: "" },
+      kickoff: { $gt: now }
+    });
+
+    if (candidates.length === 0) {
+      return;
+    }
+
+    const dates = getNbaDateRangeToken(ESPN_NBA_SYNC_DAYS_AHEAD);
+    const events = await fetchNbaScoreboardEvents(dates);
+    const incomingByEventId = new Map();
+
+    for (const event of events) {
+      const incoming = buildNbaMatchFromEspnEvent(event);
+      if (incoming?.espnEventId) {
+        incomingByEventId.set(incoming.espnEventId, incoming);
+      }
+    }
+
+    let checked = 0;
+    let oddsUpdated = 0;
+
+    for (const match of candidates) {
+      const incoming = incomingByEventId.get(match.espnEventId);
+      if (!incoming || incoming.odds.length === 0) {
+        continue;
+      }
+
+      const kickoffTime = new Date(match.kickoff).getTime();
+      if (!Number.isFinite(kickoffTime) || kickoffTime <= Date.now()) {
+        continue;
+      }
+
+      const timeToKickoffMs = kickoffTime - Date.now();
+      const requiredIntervalMs = timeToKickoffMs <= ESPN_NBA_PREMATCH_NEAR_WINDOW_MS
+        ? ESPN_NBA_PREMATCH_SYNC_NEAR_INTERVAL_MS
+        : ESPN_NBA_PREMATCH_SYNC_FAR_INTERVAL_MS;
+
+      const lastSyncedAt = match.prematchOddsSyncedAt ? new Date(match.prematchOddsSyncedAt) : null;
+      const lastSyncedMs = lastSyncedAt && Number.isFinite(lastSyncedAt.getTime())
+        ? lastSyncedAt.getTime()
+        : null;
+
+      if (lastSyncedMs && (Date.now() - lastSyncedMs) < requiredIntervalMs) {
+        continue;
+      }
+
+      checked += 1;
+      const beforeOdds = JSON.stringify(match.odds || []);
+      const nextOdds = JSON.stringify(incoming.odds);
+
+      match.odds = incoming.odds;
+      match.prematchOddsSyncedAt = now;
+
+      if (beforeOdds !== nextOdds) {
+        oddsUpdated += 1;
+      }
+
+      await match.save();
+    }
+
+    if (checked > 0 || oddsUpdated > 0) {
+      console.log(`NBA prematch odds sync: checked ${checked}, updated ${oddsUpdated}.`);
+    }
+  } finally {
+    nbaPrematchSyncInProgress = false;
+  }
+}
+
+async function syncNbaLiveOddsAndScores() {
+  if (!ESPN_NBA_AUTO_SYNC_ENABLED) {
+    return;
+  }
+
+  if (nbaLiveSyncInProgress) {
+    return;
+  }
+
+  nbaLiveSyncInProgress = true;
+
+  try {
+    const now = new Date();
+    const candidates = await Match.find({
+      sport: "basketball",
+      status: "open",
+      espnEventId: { $exists: true, $ne: "" },
+      kickoff: { $lte: now }
+    });
+
+    if (candidates.length === 0) {
+      return;
+    }
+
+    const dates = getNbaDateRangeTokenWithOffsets(-1, 1);
+    const events = await fetchNbaScoreboardEvents(dates);
+    const incomingByEventId = new Map();
+
+    for (const event of events) {
+      const incoming = buildNbaMatchFromEspnEvent(event);
+      if (incoming?.espnEventId) {
+        incomingByEventId.set(incoming.espnEventId, incoming);
+      }
+    }
+
+    let updated = 0;
+    let oddsUpdated = 0;
+    let scoresUpdated = 0;
+    let autoClosed = 0;
+
+    for (const match of candidates) {
+      const incoming = incomingByEventId.get(match.espnEventId);
+      if (!incoming) {
+        continue;
+      }
+
+      let changed = false;
+
+      match.homeTeam = incoming.homeTeam;
+      match.awayTeam = incoming.awayTeam;
+      match.stadium = incoming.stadium || match.stadium;
+      match.kickoff = incoming.kickoff;
+
+      if (incoming.odds.length > 0) {
+        match.odds = incoming.odds;
+        oddsUpdated += 1;
+        changed = true;
+      }
+
+      if (incoming.hasLiveScore) {
+        const scoreChanged = match.scoreHome !== incoming.scoreHome || match.scoreAway !== incoming.scoreAway;
+        match.scoreHome = incoming.scoreHome;
+        match.scoreAway = incoming.scoreAway;
+        if (scoreChanged) {
+          scoresUpdated += 1;
+        }
+        changed = true;
+      }
+
+      const isPostState = incoming.state === "post";
+      if (ESPN_NBA_AUTO_CLOSE_ENABLED && isPostState) {
+        const winnerKeys = deriveWinnerKeysByScore(incoming.scoreHome, incoming.scoreAway, match.odds);
+        if (winnerKeys.length > 0) {
+          await closeMatchAndSettleBets(match, {
+            winnerKeys,
+            scoreHome: incoming.scoreHome,
+            scoreAway: incoming.scoreAway
+          });
+          autoClosed += 1;
+          continue;
+        }
+      }
+
+      if (changed) {
+        await match.save();
+        updated += 1;
+      }
+    }
+
+    if (updated > 0 || oddsUpdated > 0 || scoresUpdated > 0 || autoClosed > 0) {
+      console.log(
+        `NBA live sync complete: updated ${updated}, odds updated ${oddsUpdated}, scores updated ${scoresUpdated}, auto closed ${autoClosed}.`
+      );
+    }
+  } finally {
+    nbaLiveSyncInProgress = false;
+  }
+}
+
+function startNbaCreateSyncScheduler() {
+  if (nbaCreateSyncIntervalId) {
+    clearInterval(nbaCreateSyncIntervalId);
+  }
+
+  if (!ESPN_NBA_AUTO_SYNC_ENABLED) {
+    console.log("NBA auto-sync is disabled (ESPN_NBA_AUTO_SYNC_ENABLED=false).");
+    return;
+  }
+
+  nbaCreateSyncIntervalId = setInterval(() => {
+    void syncNbaCreateMatches().catch((error) => {
+      console.error("Failed to create NBA matches from ESPN:", error);
+    });
+  }, ESPN_NBA_CREATE_SYNC_INTERVAL_MS);
+}
+
+function startNbaLiveSyncScheduler() {
+  if (nbaLiveSyncIntervalId) {
+    clearInterval(nbaLiveSyncIntervalId);
+  }
+
+  if (!ESPN_NBA_AUTO_SYNC_ENABLED) {
+    console.log("NBA auto-sync is disabled (ESPN_NBA_AUTO_SYNC_ENABLED=false).");
+    return;
+  }
+
+  nbaLiveSyncIntervalId = setInterval(() => {
+    void syncNbaLiveOddsAndScores().catch((error) => {
+      console.error("Failed to sync NBA live odds/score from ESPN:", error);
+    });
+  }, ESPN_NBA_LIVE_SYNC_INTERVAL_MS);
+}
+
+function startNbaPrematchSyncScheduler() {
+  if (nbaPrematchSyncIntervalId) {
+    clearInterval(nbaPrematchSyncIntervalId);
+  }
+
+  if (!ESPN_NBA_AUTO_SYNC_ENABLED) {
+    console.log("NBA auto-sync is disabled (ESPN_NBA_AUTO_SYNC_ENABLED=false).");
+    return;
+  }
+
+  nbaPrematchSyncIntervalId = setInterval(() => {
+    void syncNbaPrematchOdds().catch((error) => {
+      console.error("Failed to sync NBA prematch odds from ESPN:", error);
+    });
+  }, ESPN_NBA_PREMATCH_SYNC_CHECK_INTERVAL_MS);
+}
+
 async function generateMatchCode() {
   for (let attempt = 0; attempt < 50; attempt += 1) {
     const code = 100 + Math.floor(Math.random() * 900);
@@ -853,6 +1269,57 @@ async function pruneOldMatches() {
 
   const staleIds = matches.slice(8).map((m) => m._id);
   await Match.deleteMany({ _id: { $in: staleIds } });
+}
+
+async function backfillMatchSports() {
+  await Match.updateMany(
+    {
+      $or: [
+        { sport: { $exists: false } },
+        { sport: null },
+        { sport: "" }
+      ]
+    },
+    {
+      $set: {
+        sport: "football"
+      }
+    }
+  );
+}
+
+async function cleanupOldBettingData() {
+  const now = Date.now();
+  const matchCutoff = new Date(now - Math.max(1, MATCH_HISTORY_RETENTION_DAYS) * 24 * 60 * 60_000);
+  const betCutoff = new Date(now - Math.max(1, BET_HISTORY_RETENTION_DAYS) * 24 * 60 * 60_000);
+
+  const staleMatches = await Match.find({
+    status: "closed",
+    kickoff: { $lt: matchCutoff }
+  }).select("_id");
+
+  if (staleMatches.length > 0) {
+    const staleMatchIds = staleMatches.map((item) => item._id);
+    await Bet.deleteMany({ matchId: { $in: staleMatchIds } });
+    await Match.deleteMany({ _id: { $in: staleMatchIds } });
+  }
+
+  await Bet.deleteMany({
+    status: { $in: ["won", "lost"] },
+    createdAt: { $lt: betCutoff }
+  });
+}
+
+function startDataCleanupScheduler() {
+  if (dataCleanupIntervalId) {
+    clearInterval(dataCleanupIntervalId);
+  }
+
+  dataCleanupIntervalId = setInterval(() => {
+    void cleanupOldBettingData().catch((error) => {
+      console.error("Failed to cleanup old betting data:", error);
+    });
+  }, DATA_CLEANUP_INTERVAL_MS);
 }
 
 async function pruneChatMessages() {
@@ -1270,7 +1737,20 @@ async function resolveAviatorCrash() {
 
 app.get("/api/matches", async (req, res) => {
   const status = req.query.status;
-  const query = status ? { status } : {};
+  const sport = typeof req.query.sport === "string" ? req.query.sport.trim().toLowerCase() : "";
+  const query = {};
+
+  if (status) {
+    query.status = status;
+  }
+
+  if (sport) {
+    if (!["football", "basketball"].includes(sport)) {
+      return res.status(400).json({ error: "Invalid sport" });
+    }
+    query.sport = sport;
+  }
+
   const matches = await Match.find(query).sort({ kickoff: 1 });
   res.json(matches);
 });
@@ -1586,9 +2066,14 @@ app.post("/api/admin/broadcast", async (req, res) => {
 });
 
 app.post("/api/matches", async (req, res) => {
-  const { homeTeam, awayTeam, stadium, kickoff, odds } = req.body;
+  const { homeTeam, awayTeam, stadium, kickoff, odds, sport } = req.body;
   if (!homeTeam || !awayTeam || !kickoff || !Array.isArray(odds) || odds.length === 0) {
     return res.status(400).json({ error: "Invalid payload" });
+  }
+
+  const normalizedSport = typeof sport === "string" ? sport.trim().toLowerCase() : "football";
+  if (!["football", "basketball"].includes(normalizedSport)) {
+    return res.status(400).json({ error: "Invalid sport" });
   }
 
   const kickoffDate = parseKickoffInput(kickoff);
@@ -1599,6 +2084,7 @@ app.post("/api/matches", async (req, res) => {
   const matchCode = await generateMatchCode();
 
   const match = await Match.create({
+    sport: normalizedSport,
     matchCode,
     homeTeam,
     awayTeam,
@@ -1631,13 +2117,27 @@ app.put("/api/matches/:id", async (req, res) => {
     }
   }
 
-  const allowed = ["homeTeam", "awayTeam", "stadium", "kickoff", "odds"];
+  if (updates.sport !== undefined) {
+    const nextSport = typeof updates.sport === "string" ? updates.sport.trim().toLowerCase() : "";
+    if (!["football", "basketball"].includes(nextSport)) {
+      return res.status(400).json({ error: "Invalid sport" });
+    }
+  }
+
+  const allowed = ["homeTeam", "awayTeam", "stadium", "kickoff", "odds", "sport"];
   allowed.forEach((key) => {
     if (updates[key] !== undefined) {
       if (key === "kickoff") {
         match[key] = parseKickoffInput(updates[key]);
         return;
       }
+
+      if (key === "sport") {
+        const nextSport = updates[key].trim().toLowerCase();
+        match[key] = nextSport;
+        return;
+      }
+
       match[key] = updates[key];
     }
   });
@@ -1845,6 +2345,10 @@ client.once("clientReady", () => {
 
 async function start() {
   await mongoose.connect(MONGODB_URI);
+  await backfillMatchSports();
+  await cleanupOldBettingData().catch((error) => {
+    console.error("Initial betting-data cleanup failed:", error);
+  });
   await syncEplCreateMatches().catch((error) => {
     console.error("Initial EPL create sync failed:", error);
   });
@@ -1854,11 +2358,24 @@ async function start() {
   await syncEplLiveOddsAndScores().catch((error) => {
     console.error("Initial EPL live sync failed:", error);
   });
+  await syncNbaCreateMatches().catch((error) => {
+    console.error("Initial NBA create sync failed:", error);
+  });
+  await syncNbaPrematchOdds().catch((error) => {
+    console.error("Initial NBA prematch sync failed:", error);
+  });
+  await syncNbaLiveOddsAndScores().catch((error) => {
+    console.error("Initial NBA live sync failed:", error);
+  });
   await lockMatchesAtKickoff();
   startMatchAutoLockScheduler();
   startEplCreateSyncScheduler();
   startEplPrematchSyncScheduler();
   startEplLiveSyncScheduler();
+  startNbaCreateSyncScheduler();
+  startNbaPrematchSyncScheduler();
+  startNbaLiveSyncScheduler();
+  startDataCleanupScheduler();
 
   app.listen(PORT, () => {
     console.log(`Admin panel on http://localhost:${PORT}/admin`);

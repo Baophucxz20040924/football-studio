@@ -527,7 +527,7 @@ async function runSession(channel, session) {
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName("football")
+    .setName("fb")
     .setDescription("Football Studio - dat cuoc Home/Away/Draw"),
   async execute(interaction) {
     if (!interaction.channel) {

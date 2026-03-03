@@ -3,6 +3,9 @@ const Bet = require("../../models/Bet");
 const Match = require("../../models/Match");
 const { buildEmbed, getOrCreateUser, formatPoints } = require("./utils");
 
+const BETS_RETENTION_DAYS = 7;
+const MAX_BETS_IN_REPLY = 10;
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("bets")
@@ -11,14 +14,17 @@ module.exports = {
     const userName = interaction.user.globalName || interaction.user.username;
     await getOrCreateUser(interaction.user.id, userName);
 
-    const bets = await Bet.find({ userId: interaction.user.id }).sort({ createdAt: -1 });
-    if (bets.length > 20) {
-      const stale = bets.slice(20);
-      await Bet.deleteMany({ _id: { $in: stale.map((b) => b._id) } });
-      bets.splice(20);
-    }
+    const staleBefore = new Date(Date.now() - BETS_RETENTION_DAYS * 24 * 60 * 60_000);
+    await Bet.deleteMany({
+      userId: interaction.user.id,
+      status: { $in: ["won", "lost"] },
+      createdAt: { $lt: staleBefore }
+    });
 
-    if (bets.length === 0) {
+    const bets = await Bet.find({ userId: interaction.user.id }).sort({ createdAt: -1 });
+    const visibleBets = bets.slice(0, MAX_BETS_IN_REPLY);
+
+    if (visibleBets.length === 0) {
       const embed = buildEmbed({
         title: "No open bets 💤",
         description: "You have no bets yet. \ud83c\udf43",
@@ -27,17 +33,19 @@ module.exports = {
       return interaction.reply({ embeds: [embed], ephemeral: true });
     }
 
-    const matchIds = bets.map((b) => b.matchId);
+    const matchIds = visibleBets.map((b) => b.matchId);
     const matches = await Match.find({ _id: { $in: matchIds } });
     const matchMap = new Map(matches.map((m) => [String(m._id), m]));
 
-    const embeds = bets.map((b) => {
+    const embeds = visibleBets.map((b) => {
       const match = matchMap.get(String(b.matchId));
+      const sport = match?.sport === "basketball" ? "basketball" : "football";
+      const sportLabel = sport === "basketball" ? "🏀 NBA" : "⚽ Football";
       const label = match ? `${match.homeTeam} vs ${match.awayTeam}` : "Match";
       const score = match ? `${match.scoreHome ?? 0}-${match.scoreAway ?? 0}` : "-";
-      const corner = match
+      const corner = sport === "football" && match
         ? `Corner: ${match.homeTeam}(${match.cornerHome ?? 0}) - ${match.awayTeam}(${match.cornerAway ?? 0})`
-        : "Corner: -";
+        : null;
       const potential = Math.round(b.amount * b.multiplier);
       const statusLabel = b.status === "open"
         ? "pending"
@@ -56,13 +64,19 @@ module.exports = {
           ? "\ud83d\udfe2"
           : "\ud83d\udd34";
 
-      const description = [
+      const descriptionLines = [
         `**${label}**`,
+        `Sport: ${sportLabel}`,
         `Status: ${statusEmoji} **${statusLabel}** | Score: ${score}`,
-        corner,
         `Pick: ${b.pickKey} (x${b.multiplier}) \u26bd`,
         `Stake: ${formatPoints(b.amount)} | Win: ${formatPoints(potential)} \ud83d\udcb0`
-      ].join("\n");
+      ];
+
+      if (corner) {
+        descriptionLines.splice(3, 0, corner);
+      }
+
+      const description = descriptionLines.join("\n");
 
       return buildEmbed({
         title: "Your bet \u26bd",

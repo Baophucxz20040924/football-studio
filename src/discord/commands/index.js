@@ -20,7 +20,8 @@ const commands = [
   require("./daily"),
   require("./work"),
   require("./ranking"),
-  require("./epl-rank")
+  require("./epl-rank"),
+  require("./donate")
 ];
 
 function getCommandData() {

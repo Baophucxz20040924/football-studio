@@ -88,8 +88,8 @@ function resolveTeamEmoji(guild, teamName) {
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName("football")
-    .setDescription("List open football matches"),
+    .setName("epl")
+    .setDescription("List open EPL matches"),
   async execute(interaction) {
     await primeEmojiCaches(interaction.guild).catch(() => null);
 
@@ -132,8 +132,8 @@ module.exports = {
     const descriptions = chunkDescriptions(blocks);
     const embeds = descriptions.map((description, index) => buildEmbed({
       title: descriptions.length > 1
-        ? `Open football matches ⚽ (${index + 1}/${descriptions.length})`
-        : "Open football matches ⚽",
+        ? `Open EPL matches ⚽ (${index + 1}/${descriptions.length})`
+        : "Open EPL matches ⚽",
       description,
       color: 0xf6c244
     }));

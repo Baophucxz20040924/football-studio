@@ -8,7 +8,7 @@ module.exports = {
   async execute(interaction) {
     const description = [
       "**Lệnh cơ bản**",
-        "⚽ **/football** - Danh sách trận bóng đá đang mở (có mã trận)",
+        "⚽ **/epl** - Danh sách trận bóng đá đang mở (có mã trận)",
         "🏀 **/nba** - Danh sách trận NBA đang mở (có mã trận)",
       "⚡ **/bet-epl** - Đặt cược EPL bằng nút chọn",
       "⚡ **/bet-nba** - Đặt cược NBA bằng nút chọn",

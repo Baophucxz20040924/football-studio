@@ -158,6 +158,19 @@ function buildComponentPayload(matches, selectedMatch, selectedPickKey, selected
   };
 }
 
+async function resolveTopBanner(topBanner, interaction) {
+  if (!topBanner) {
+    return "";
+  }
+
+  if (typeof topBanner === "function") {
+    const resolved = await topBanner(interaction);
+    return typeof resolved === "string" ? resolved : "";
+  }
+
+  return typeof topBanner === "string" ? topBanner : "";
+}
+
 function createQuickBetCommand({
   commandName,
   commandDescription,
@@ -203,8 +216,12 @@ function createQuickBetCommand({
       let selectedPickKey = "";
       let selectedAmount = null;
       let finalized = false;
+      const runtimeConfig = {
+        ...config,
+        topBanner: await resolveTopBanner(config.topBanner, interaction)
+      };
 
-      await interaction.reply(buildComponentPayload(matches, selectedMatch, selectedPickKey, selectedAmount, config));
+      await interaction.reply(buildComponentPayload(matches, selectedMatch, selectedPickKey, selectedAmount, runtimeConfig));
       const replyMessage = await interaction.fetchReply();
 
       const collector = replyMessage.createMessageComponentCollector({
@@ -227,7 +244,7 @@ function createQuickBetCommand({
             selectedAmount = null;
 
             await componentInteraction.update(
-              buildComponentPayload(matches, selectedMatch, selectedPickKey, selectedAmount, config)
+              buildComponentPayload(matches, selectedMatch, selectedPickKey, selectedAmount, runtimeConfig)
             );
             return;
           }
@@ -247,7 +264,7 @@ function createQuickBetCommand({
             selectedPickKey = pickKey;
             selectedAmount = null;
             await componentInteraction.update(
-              buildComponentPayload(matches, selectedMatch, selectedPickKey, selectedAmount, config)
+              buildComponentPayload(matches, selectedMatch, selectedPickKey, selectedAmount, runtimeConfig)
             );
             return;
           }
@@ -286,7 +303,7 @@ function createQuickBetCommand({
 
           selectedAmount = Math.floor(parsed);
           await componentInteraction.update(
-            buildComponentPayload(matches, selectedMatch, selectedPickKey, selectedAmount, config)
+            buildComponentPayload(matches, selectedMatch, selectedPickKey, selectedAmount, runtimeConfig)
           );
           return;
         }
@@ -336,7 +353,7 @@ function createQuickBetCommand({
           });
 
           await interaction.editReply(
-            buildComponentPayload(matches, selectedMatch, selectedPickKey, selectedAmount, config)
+            buildComponentPayload(matches, selectedMatch, selectedPickKey, selectedAmount, runtimeConfig)
           );
           return;
         }

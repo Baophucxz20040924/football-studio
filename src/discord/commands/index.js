@@ -3,10 +3,12 @@ const { MessageFlags } = require("discord.js");
 const commands = [
   require("./matches"),
   require("./nba"),
-  require("./bet"),
+  require("./bet-epl"),
+  require("./bet-nba"),
   require("./balance"),
   require("./bets"),
-  require("./live"),
+  require("./live-epl"),
+  require("./live-nba"),
   require("./help"),
   require("./give"),
   require("./aviator"),
@@ -22,7 +24,8 @@ const commands = [
   require("./work"),
   require("./ranking"),
   require("./epl-rank"),
-  require("./donate")
+  require("./donate"),
+  require("./sync-now")
 ];
 
 function getCommandData() {
@@ -138,9 +141,9 @@ async function handleInteraction(interaction) {
     console.error(err);
     try {
       if (interaction.deferred || interaction.replied) {
-        await interaction.followUp({ content: "Something went wrong.", ephemeral: true });
+        await interaction.followUp({ content: "Something went wrong.", flags: MessageFlags.Ephemeral });
       } else {
-        await interaction.reply({ content: "Something went wrong.", ephemeral: true });
+        await interaction.reply({ content: "Something went wrong.", flags: MessageFlags.Ephemeral });
       }
     } catch (replyError) {
       if (!isIgnorableInteractionError(replyError)) {

@@ -17,14 +17,19 @@ function formatGoals(goals) {
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName("live")
-    .setDescription("List live matches"),
+    .setName("live-epl")
+    .setDescription("List live EPL/football matches"),
   async execute(interaction) {
-    const matches = await Match.find({ status: "open", isLive: true }).sort({ kickoff: 1 });
+    const matches = await Match.find({
+      sport: "football",
+      status: "open",
+      isLive: true
+    }).sort({ kickoff: 1 });
+
     if (matches.length === 0) {
       const embed = buildEmbed({
-        title: "No live matches ⏳",
-        description: "No games are live right now. \ud83d\udcf4",
+        title: "No live EPL matches ⏳",
+        description: "No EPL/football games are live right now. 📴",
         color: 0xf36c5c
       });
       return interaction.reply({ embeds: [embed] });
@@ -32,27 +37,21 @@ module.exports = {
 
     const description = matches
       .map((match) => {
-        const sport = match.sport === "basketball" ? "basketball" : "football";
-        const sportLabel = sport === "basketball" ? "🏀 NBA" : "⚽ Football";
         const score = `${match.scoreHome ?? 0}-${match.scoreAway ?? 0}`;
-        const lines = [
+        const corner = `Corner: ${match.homeTeam}(${match.cornerHome ?? 0}) - ${match.awayTeam}(${match.cornerAway ?? 0})`;
+        const goals = formatGoals(match.goals);
+
+        return [
           `**${match.homeTeam} vs ${match.awayTeam}**`,
-          `Sport: ${sportLabel}`,
-          `Score: ${score} 🔥`
-        ];
-
-        if (sport === "football") {
-          const corner = `Corner: ${match.homeTeam}(${match.cornerHome ?? 0}) - ${match.awayTeam}(${match.cornerAway ?? 0})`;
-          const goals = formatGoals(match.goals);
-          lines.push(corner, goals);
-        }
-
-        return lines.join("\n");
+          `Score: ${score} 🔥`,
+          corner,
+          goals
+        ].join("\n");
       })
       .join("\n\n");
 
     const embed = buildEmbed({
-      title: "Live matches \ud83d\udd34",
+      title: "Live EPL matches 🔴",
       description,
       color: 0xf36c5c
     });

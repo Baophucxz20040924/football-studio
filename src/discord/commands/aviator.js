@@ -2,7 +2,8 @@ const {
   SlashCommandBuilder,
   ActionRowBuilder,
   ButtonBuilder,
-  ButtonStyle
+  ButtonStyle,
+  MessageFlags
 } = require("discord.js");
 const { buildEmbed, getOrCreateUser } = require("./utils");
 const { createAviatorToken, TOKEN_TTL_MS } = require("../../aviator/token");
@@ -32,6 +33,6 @@ module.exports = {
         .setURL(link)
     );
 
-    return interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+    return interaction.reply({ embeds: [embed], components: [row], flags: MessageFlags.Ephemeral });
   }
 };

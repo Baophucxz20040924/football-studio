@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require("discord.js");
+const { SlashCommandBuilder, MessageFlags } = require("discord.js");
 const Match = require("../../models/Match");
 const { formatOdds, formatKickoff, buildEmbed, primeEmojiCaches, findEmojiByName } = require("./utils");
 
@@ -105,7 +105,7 @@ module.exports = {
         description: "No games are open for betting right now. \ud83c\udfdb\ufe0f",
         color: 0x6ae4c5
       });
-      return interaction.reply({ embeds: [embed], ephemeral: true });
+      return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
     }
 
     const blocks = matches

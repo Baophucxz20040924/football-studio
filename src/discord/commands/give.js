@@ -2,7 +2,8 @@ const {
   SlashCommandBuilder,
   ActionRowBuilder,
   ButtonBuilder,
-  ButtonStyle
+  ButtonStyle,
+  MessageFlags
 } = require("discord.js");
 const { buildEmbed, getOrCreateUser, normalizeAmount, formatPoints } = require("./utils");
 
@@ -28,7 +29,7 @@ module.exports = {
         description: "Vui lòng nhập số dương. \ud83d\udcb8",
         color: 0xf36c5c
       });
-      return interaction.reply({ embeds: [embed], ephemeral: true });
+      return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
     }
 
     if (receiver.id === interaction.user.id) {
@@ -37,7 +38,7 @@ module.exports = {
         description: "Bạn không thể tự chuyển điểm cho chính mình.",
         color: 0xf36c5c
       });
-      return interaction.reply({ embeds: [embed], ephemeral: true });
+      return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
     }
 
     const senderName = interaction.user.globalName || interaction.user.username;
@@ -76,18 +77,18 @@ module.exports = {
     collector.on("collect", async (btn) => {
       const [action, senderId, receiverId, rawAmount] = btn.customId.split(":");
       if (senderId !== btn.user.id) {
-        await btn.reply({ content: "Bạn không phải người gửi.", ephemeral: true });
+        await btn.reply({ content: "Bạn không phải người gửi.", flags: MessageFlags.Ephemeral });
         return;
       }
 
       if (senderId !== interaction.user.id || receiverId !== receiver.id) {
-        await btn.reply({ content: "Yêu cầu không hợp lệ.", ephemeral: true });
+        await btn.reply({ content: "Yêu cầu không hợp lệ.", flags: MessageFlags.Ephemeral });
         return;
       }
 
       const parsedAmount = normalizeAmount(rawAmount);
       if (!parsedAmount) {
-        await btn.reply({ content: "Số tiền không hợp lệ.", ephemeral: true });
+        await btn.reply({ content: "Số tiền không hợp lệ.", flags: MessageFlags.Ephemeral });
         return;
       }
 

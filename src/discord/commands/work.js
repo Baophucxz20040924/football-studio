@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require("discord.js");
+const { SlashCommandBuilder, MessageFlags } = require("discord.js");
 const { buildEmbed, getOrCreateUser, formatPoints } = require("./utils");
 
 const MIN_REWARD = 50;
@@ -44,7 +44,7 @@ module.exports = {
           color: 0xf59e0b
         });
 
-        return interaction.reply({ embeds: [embed], ephemeral: true });
+        return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
       }
     }
 

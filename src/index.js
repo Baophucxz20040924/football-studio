@@ -82,6 +82,7 @@ let nbaLiveSyncIntervalId = null;
 let nbaCreateSyncInProgress = false;
 let nbaPrematchSyncInProgress = false;
 let nbaLiveSyncInProgress = false;
+let manualSyncInProgress = false;
 let dataCleanupIntervalId = null;
 
 function parseKickoffInput(value) {
@@ -323,6 +324,60 @@ function formatTotalLineForKey(line) {
   return String(Math.round(line * 100) / 100);
 }
 
+function parseSpreadLineValue(value) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  const raw = String(value).trim().toLowerCase();
+  if (!raw) {
+    return null;
+  }
+
+  if (raw === "pk" || raw === "pick" || raw === "pickem" || raw === "pick'em") {
+    return 0;
+  }
+
+  const normalized = raw.replace(/[^0-9+\-.]/g, "");
+  if (!normalized) {
+    return null;
+  }
+
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function formatSpreadLineForKey(line) {
+  if (!Number.isFinite(line)) {
+    return "";
+  }
+
+  if (Number.isInteger(line)) {
+    return String(line);
+  }
+
+  return String(Math.round(line * 100) / 100);
+}
+
+function parseSpreadLineFromPickKey(key) {
+  const match = String(key || "").trim().match(/^hcp_(home|away)\(([-+]?\d+(?:\.\d+)?)\)$/i);
+  if (!match) {
+    return null;
+  }
+
+  const side = match[1].toLowerCase();
+  const line = Number(match[2]);
+  if (!Number.isFinite(line)) {
+    return null;
+  }
+
+  return { side, line };
+}
+
 function parseTotalLineFromPickKey(key) {
   const match = String(key || "").trim().match(/^(?:big|small)\(([-+]?\d+(?:\.\d+)?)\)$/i);
   if (!match) {
@@ -423,6 +478,42 @@ function extractEplOdds(competition) {
       mapped.push({ key: `big(${line})`, multiplier: totalMarket.overMultiplier });
       mapped.push({ key: `small(${line})`, multiplier: totalMarket.underMultiplier });
     }
+  }
+
+  const pointSpread = odds?.pointSpread || {};
+  const spreadHomeNode = pointSpread?.home || {};
+  const spreadAwayNode = pointSpread?.away || {};
+
+  const homeSpreadLine = parseSpreadLineValue(
+    spreadHomeNode?.close?.line
+    ?? spreadHomeNode?.open?.line
+    ?? spreadHomeNode?.line
+  );
+  const awaySpreadLine = parseSpreadLineValue(
+    spreadAwayNode?.close?.line
+    ?? spreadAwayNode?.open?.line
+    ?? spreadAwayNode?.line
+  );
+
+  const homeSpreadMultiplier = parseAmericanOddsToMultiplier(
+    spreadHomeNode?.close?.odds
+    ?? spreadHomeNode?.open?.odds
+    ?? spreadHomeNode?.odds
+  );
+  const awaySpreadMultiplier = parseAmericanOddsToMultiplier(
+    spreadAwayNode?.close?.odds
+    ?? spreadAwayNode?.open?.odds
+    ?? spreadAwayNode?.odds
+  );
+
+  const homeSpreadKeyLine = formatSpreadLineForKey(homeSpreadLine);
+  if (homeSpreadKeyLine && Number.isFinite(homeSpreadMultiplier)) {
+    mapped.push({ key: `hcp_home(${homeSpreadKeyLine})`, multiplier: homeSpreadMultiplier });
+  }
+
+  const awaySpreadKeyLine = formatSpreadLineForKey(awaySpreadLine);
+  if (awaySpreadKeyLine && Number.isFinite(awaySpreadMultiplier)) {
+    mapped.push({ key: `hcp_away(${awaySpreadKeyLine})`, multiplier: awaySpreadMultiplier });
   }
 
   const dedupedByKey = new Map();
@@ -572,6 +663,46 @@ function deriveWinnerKeysByScore(scoreHome, scoreAway, odds = []) {
     }
   }
 
+  const spreadMarkets = new Map();
+  for (const odd of oddsList) {
+    const parsed = parseSpreadLineFromPickKey(odd?.key);
+    if (!parsed) {
+      continue;
+    }
+
+    const homeEquivalent = parsed.side === "home" ? parsed.line : -parsed.line;
+    const normalizedHomeLine = formatSpreadLineForKey(homeEquivalent);
+    if (!normalizedHomeLine) {
+      continue;
+    }
+
+    const current = spreadMarkets.get(normalizedHomeLine) || {};
+    if (parsed.side === "home") {
+      current.homeKey = odd.key;
+    } else {
+      current.awayKey = odd.key;
+    }
+    spreadMarkets.set(normalizedHomeLine, current);
+  }
+
+  for (const [homeLineText, market] of spreadMarkets) {
+    if (!market.homeKey || !market.awayKey) {
+      continue;
+    }
+
+    const homeLine = Number(homeLineText);
+    if (!Number.isFinite(homeLine)) {
+      continue;
+    }
+
+    const adjustedHome = scoreHome + homeLine;
+    if (adjustedHome > scoreAway) {
+      winnerKeys.push(market.homeKey);
+    } else if (adjustedHome < scoreAway) {
+      winnerKeys.push(market.awayKey);
+    }
+  }
+
   return winnerKeys;
 }
 
@@ -696,7 +827,7 @@ async function syncEplCreateMatches() {
   }
 }
 
-async function syncEplPrematchOdds() {
+async function syncEplPrematchOdds({ forcePrematch = false } = {}) {
   if (!ESPN_EPL_AUTO_SYNC_ENABLED) {
     return;
   }
@@ -755,7 +886,7 @@ async function syncEplPrematchOdds() {
         ? lastSyncedAt.getTime()
         : null;
 
-      if (lastSyncedMs && (Date.now() - lastSyncedMs) < requiredIntervalMs) {
+      if (!forcePrematch && lastSyncedMs && (Date.now() - lastSyncedMs) < requiredIntervalMs) {
         continue;
       }
 
@@ -817,7 +948,6 @@ async function syncEplLiveOddsAndScores() {
     }
 
     let updated = 0;
-    let oddsUpdated = 0;
     let scoresUpdated = 0;
     let autoClosed = 0;
 
@@ -833,12 +963,6 @@ async function syncEplLiveOddsAndScores() {
       match.awayTeam = incoming.awayTeam;
       match.stadium = incoming.stadium || match.stadium;
       match.kickoff = incoming.kickoff;
-
-      if (incoming.odds.length > 0) {
-        match.odds = incoming.odds;
-        oddsUpdated += 1;
-        changed = true;
-      }
 
       if (incoming.hasLiveScore) {
         const scoreChanged = match.scoreHome !== incoming.scoreHome || match.scoreAway !== incoming.scoreAway;
@@ -870,9 +994,9 @@ async function syncEplLiveOddsAndScores() {
       }
     }
 
-    if (updated > 0 || oddsUpdated > 0 || scoresUpdated > 0 || autoClosed > 0) {
+    if (updated > 0 || scoresUpdated > 0 || autoClosed > 0) {
       console.log(
-        `EPL live sync complete: updated ${updated}, odds updated ${oddsUpdated}, scores updated ${scoresUpdated}, auto closed ${autoClosed}.`
+        `EPL live sync complete: updated ${updated}, scores updated ${scoresUpdated}, auto closed ${autoClosed}.`
       );
     }
   } finally {
@@ -1015,7 +1139,7 @@ async function syncNbaCreateMatches() {
   }
 }
 
-async function syncNbaPrematchOdds() {
+async function syncNbaPrematchOdds({ forcePrematch = false } = {}) {
   if (!ESPN_NBA_AUTO_SYNC_ENABLED) {
     return;
   }
@@ -1074,7 +1198,7 @@ async function syncNbaPrematchOdds() {
         ? lastSyncedAt.getTime()
         : null;
 
-      if (lastSyncedMs && (Date.now() - lastSyncedMs) < requiredIntervalMs) {
+      if (!forcePrematch && lastSyncedMs && (Date.now() - lastSyncedMs) < requiredIntervalMs) {
         continue;
       }
 
@@ -1136,7 +1260,6 @@ async function syncNbaLiveOddsAndScores() {
     }
 
     let updated = 0;
-    let oddsUpdated = 0;
     let scoresUpdated = 0;
     let autoClosed = 0;
 
@@ -1152,12 +1275,6 @@ async function syncNbaLiveOddsAndScores() {
       match.awayTeam = incoming.awayTeam;
       match.stadium = incoming.stadium || match.stadium;
       match.kickoff = incoming.kickoff;
-
-      if (incoming.odds.length > 0) {
-        match.odds = incoming.odds;
-        oddsUpdated += 1;
-        changed = true;
-      }
 
       if (incoming.hasLiveScore) {
         const scoreChanged = match.scoreHome !== incoming.scoreHome || match.scoreAway !== incoming.scoreAway;
@@ -1189,9 +1306,9 @@ async function syncNbaLiveOddsAndScores() {
       }
     }
 
-    if (updated > 0 || oddsUpdated > 0 || scoresUpdated > 0 || autoClosed > 0) {
+    if (updated > 0 || scoresUpdated > 0 || autoClosed > 0) {
       console.log(
-        `NBA live sync complete: updated ${updated}, odds updated ${oddsUpdated}, scores updated ${scoresUpdated}, auto closed ${autoClosed}.`
+        `NBA live sync complete: updated ${updated}, scores updated ${scoresUpdated}, auto closed ${autoClosed}.`
       );
     }
   } finally {
@@ -1322,6 +1439,29 @@ function startDataCleanupScheduler() {
   }, DATA_CLEANUP_INTERVAL_MS);
 }
 
+async function runManualSyncNow({ forcePrematch = false } = {}) {
+  if (manualSyncInProgress) {
+    return { skipped: true, reason: "manual-sync-in-progress" };
+  }
+
+  manualSyncInProgress = true;
+
+  try {
+    await syncEplCreateMatches();
+    await syncEplPrematchOdds({ forcePrematch });
+    await syncEplLiveOddsAndScores();
+
+    await syncNbaCreateMatches();
+    await syncNbaPrematchOdds({ forcePrematch });
+    await syncNbaLiveOddsAndScores();
+
+    await lockMatchesAtKickoff();
+    return { skipped: false };
+  } finally {
+    manualSyncInProgress = false;
+  }
+}
+
 async function pruneChatMessages() {
   const total = await ChatMessage.countDocuments({});
   if (total <= 300) {
@@ -1409,6 +1549,37 @@ app.get("/chat", (req, res) => {
 
 app.get("/api/health", (req, res) => {
   res.json({ ok: true });
+});
+
+app.post("/api/admin/sync-now", async (req, res) => {
+  const requestIp = String(req.ip || "");
+  const isLocal = requestIp === "::1" || requestIp === "::ffff:127.0.0.1" || requestIp === "127.0.0.1";
+  if (!isLocal) {
+    return res.status(403).json({ error: "forbidden" });
+  }
+
+  const startedAt = new Date();
+  const forcePrematch = req.body?.forcePrematch !== false;
+
+  try {
+    const syncState = await runManualSyncNow({ forcePrematch });
+
+    return res.json({
+      ok: true,
+      startedAt: startedAt.toISOString(),
+      finishedAt: new Date().toISOString(),
+      forcePrematch,
+      ...syncState
+    });
+  } catch (error) {
+    return res.status(500).json({
+      ok: false,
+      startedAt: startedAt.toISOString(),
+      finishedAt: new Date().toISOString(),
+      forcePrematch,
+      error: String(error?.message || error)
+    });
+  }
 });
 
 app.get("/api/chat/messages", async (req, res) => {
@@ -2202,6 +2373,9 @@ app.post("/api/matches/:id/live", async (req, res) => {
   }
 
   match.isLive = Boolean(isLive);
+  if (match.isLive) {
+    match.betLocked = true;
+  }
   await match.save();
   res.json(match);
 });

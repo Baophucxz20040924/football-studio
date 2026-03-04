@@ -4,34 +4,26 @@ const { buildEmbed } = require("./utils");
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("helpbet")
-    .setDescription("Hướng dẫn đặt cược bằng lệnh /bet"),
+    .setDescription("Hướng dẫn đặt cược bằng /bet-epl và /bet-nba"),
   async execute(interaction) {
     const description = [
-      "**🎯 /BET - Hướng dẫn nhanh**",
+      "**🎯 BET - Hướng dẫn nhanh**",
       "",
-      "**Cú pháp:**",
-      "`/bet match_code:<mã_trận> pick_key:<kèo> amount:<điểm>`",
+      "**Lệnh đặt cược:**",
+      "`/bet-epl` - Cược nhanh cho EPL/football",
+      "`/bet-nba` - Cược nhanh cho NBA",
       "",
-      "**Ý nghĩa tham số:**",
-      "• `match_code`: Mã trận lấy từ lệnh `/football` hoặc `/nba`",
-      "• `pick_key`: Mã kèo (VD: `W1`, `W2`, `D`) tùy từng trận",
-      "• `amount`: Số điểm muốn cược (phải > 0)",
-      "",
-      "**Các bước đặt cược:**",
-      "1. Dùng `/football` hoặc `/nba` để xem trận đang mở và lấy mã trận",
-      "2. Chọn `pick_key` đúng theo odds hiển thị",
-      "3. Dùng `/bet` để đặt cược trước giờ kickoff",
-      "",
-      "**Ví dụ:**",
-      "`/bet match_code:123 pick_key:W1 amount:100`",
+      "**Luồng thao tác:**",
+      "1. Chọn trận từ menu",
+      "2. Chọn kèo từ odds hiện có",
+      "3. Chọn tiền nhanh (100/500/1000/5000/10k) hoặc bấm `Tùy chọn` để nhập số tiền",
+      "4. Bấm `Confirm` để chốt cược",
       "",
       "**Lưu ý:**",
       "• Trận đến giờ đá sẽ tự khóa cược",
-      "• Nhập sai `pick_key` bot sẽ trả về danh sách kèo hợp lệ",
       "• Nếu số dư không đủ, lệnh sẽ bị từ chối",
-      "• W1 = Cửa 1 thắng, W2 = Cửa 2 thắng, D = Hòa",
-      "• T(trái) = tổng số điểm ghi bàn lớn hơn số (trái) thì thắng kèo tài(trái), ngược lại là X(trái) = thấp hơn số ghi bàn",
-      "• TG(trái) = tổng số lần đá phạt góc lớn hơn số (trái) thì thắng kèo tài(trái), ngược lại là X(trái)",
+      "• Kèo hợp lệ phụ thuộc vào odds đang mở của trận",
+      "• Có thể nhập số tiền kiểu `10k`, `1m` khi dùng nút `Tùy chọn`",
     ].join("\n");
 
     const embed = buildEmbed({

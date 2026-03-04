@@ -5,7 +5,8 @@ const {
   ButtonStyle,
   ModalBuilder,
   TextInputBuilder,
-  TextInputStyle
+  TextInputStyle,
+  MessageFlags
 } = require("discord.js");
 const {
   buildEmbed,
@@ -496,7 +497,7 @@ async function runSession(channel, session) {
     collector.on("collect", async (btn) => {
       const [prefix, sessionId, roundId, pick] = btn.customId.split(":");
       if (prefix !== "bcr" || sessionId !== session.id || Number(roundId) !== round) {
-        await btn.reply({ content: "Phiên cược này đã hết hạn.", ephemeral: true });
+        await btn.reply({ content: "Phiên cược này đã hết hạn.", flags: MessageFlags.Ephemeral });
         return;
       }
 
@@ -526,7 +527,7 @@ async function runSession(channel, session) {
       }
 
       try {
-        await submitted.deferReply({ ephemeral: true });
+        await submitted.deferReply({ flags: MessageFlags.Ephemeral });
       } catch (error) {
         if (error?.code === 40060) {
           return;
@@ -629,7 +630,7 @@ module.exports = {
     .setDescription("Baccarat - dat cuoc Player/Banker/Tie"),
   async execute(interaction) {
     if (!interaction.channel) {
-      return interaction.reply({ content: "Lệnh này chỉ dùng trong server.", ephemeral: true });
+      return interaction.reply({ content: "Lệnh này chỉ dùng trong server.", flags: MessageFlags.Ephemeral });
     }
 
     const channelId = interaction.channelId;
@@ -637,7 +638,7 @@ module.exports = {
     if (lockedBy) {
       return interaction.reply({
         content: `${lockedBy} đang chạy ở kênh này. Hãy chờ phiên kết thúc rồi thử lại.`,
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
       });
     }
 
@@ -656,7 +657,7 @@ module.exports = {
 
       await interaction.reply({
         content: "Đã bắt đầu Baccarat. Mọi người đặt cược!",
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
       });
 
       await runSession(interaction.channel, session);

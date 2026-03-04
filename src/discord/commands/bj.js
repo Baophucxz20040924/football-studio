@@ -2,7 +2,8 @@ const {
   SlashCommandBuilder,
   ActionRowBuilder,
   ButtonBuilder,
-  ButtonStyle
+  ButtonStyle,
+  MessageFlags
 } = require("discord.js");
 const {
   buildEmbed,
@@ -304,12 +305,12 @@ module.exports = {
     const cardBackEmoji = resolveCardBackEmoji(interaction.guild);
 
     if (!interaction.channel) {
-      return interaction.reply({ content: "Lệnh này chỉ dùng trong server.", ephemeral: true });
+      return interaction.reply({ content: "Lệnh này chỉ dùng trong server.", flags: MessageFlags.Ephemeral });
     }
 
     const amount = normalizeAmount(interaction.options.getInteger("amount", true));
     if (!amount) {
-      return interaction.reply({ content: "Số điểm cược không hợp lệ.", ephemeral: true });
+      return interaction.reply({ content: "Số điểm cược không hợp lệ.", flags: MessageFlags.Ephemeral });
     }
 
     const userName = interaction.user.globalName || interaction.user.username;
@@ -317,7 +318,7 @@ module.exports = {
     if (user.balance < amount) {
       return interaction.reply({
         content: "Không đủ số dư để đặt cược này.",
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
       });
     }
 
@@ -435,17 +436,17 @@ module.exports = {
     collector.on("collect", async (btn) => {
       const [prefix, targetGameId, action] = btn.customId.split(":");
       if (prefix !== "bj" || targetGameId !== gameId) {
-        await btn.reply({ content: "Ván này đã hết hạn.", ephemeral: true });
+        await btn.reply({ content: "Ván này đã hết hạn.", flags: MessageFlags.Ephemeral });
         return;
       }
 
       if (btn.user.id !== interaction.user.id) {
-        await btn.reply({ content: "Chỉ người tạo ván mới được bấm nút.", ephemeral: true });
+        await btn.reply({ content: "Chỉ người tạo ván mới được bấm nút.", flags: MessageFlags.Ephemeral });
         return;
       }
 
       if (finished) {
-        await btn.reply({ content: "Ván đã kết thúc.", ephemeral: true });
+        await btn.reply({ content: "Ván đã kết thúc.", flags: MessageFlags.Ephemeral });
         return;
       }
 

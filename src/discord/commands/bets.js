@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require("discord.js");
+const { SlashCommandBuilder, MessageFlags } = require("discord.js");
 const Bet = require("../../models/Bet");
 const Match = require("../../models/Match");
 const { buildEmbed, getOrCreateUser, formatPoints } = require("./utils");
@@ -30,7 +30,7 @@ module.exports = {
         description: "You have no bets yet. \ud83c\udf43",
         color: 0x6ae4c5
       });
-      return interaction.reply({ embeds: [embed], ephemeral: true });
+      return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
     }
 
     const matchIds = visibleBets.map((b) => b.matchId);
@@ -85,6 +85,6 @@ module.exports = {
       });
     });
 
-    return interaction.reply({ embeds, ephemeral: true });
+    return interaction.reply({ embeds, flags: MessageFlags.Ephemeral });
   }
 };

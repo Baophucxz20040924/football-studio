@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const User = require('../../models/User');
 
 module.exports = {
@@ -46,12 +46,11 @@ module.exports = {
           title: '🏆 Top người giàu nhất',
           fields: fields,
           timestamp: new Date().toISOString(),
-        }],
-        ephemeral: false
+        }]
       });
     } catch (error) {
       console.error('Ranking command error:', error);
-      await interaction.reply({ content: 'Lỗi khi lấy ranking.', ephemeral: true });
+      await interaction.reply({ content: 'Lỗi khi lấy ranking.', flags: MessageFlags.Ephemeral });
     }
   },
 };

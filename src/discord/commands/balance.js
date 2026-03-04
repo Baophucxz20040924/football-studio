@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require("discord.js");
+const { SlashCommandBuilder, MessageFlags } = require("discord.js");
 const { buildEmbed, getOrCreateUser, formatPoints } = require("./utils");
 
 module.exports = {
@@ -13,6 +13,6 @@ module.exports = {
       description: `You have **${formatPoints(user.balance)}** points available. \ud83e\ude99`,
       color: 0x6ae4c5
     });
-    return interaction.reply({ embeds: [embed], ephemeral: true });
+    return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
   }
 };

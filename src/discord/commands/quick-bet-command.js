@@ -11,7 +11,7 @@ const {
 } = require("discord.js");
 const Match = require("../../models/Match");
 const Bet = require("../../models/Bet");
-const { buildEmbed, getOrCreateUser, formatPoints, normalizeAmount } = require("./utils");
+const { buildEmbed, getOrCreateUser, formatPoints, normalizeAmount, formatKickoff } = require("./utils");
 
 const QUICK_AMOUNT_OPTIONS = [100, 500, 1000, 5000, 10000];
 const SESSION_TIMEOUT_MS = 60000;
@@ -39,7 +39,7 @@ function formatAmountLabel(amount) {
 function buildMatchSelect(matches, selectedMatchId, prefix) {
   const options = matches.slice(0, 25).map((match) => ({
     label: truncate(`${match.matchCode ?? "-"} | ${match.homeTeam} vs ${match.awayTeam}`, 100),
-    description: truncate(`Kickoff: ${new Date(match.kickoff).toLocaleString("en-US")}`, 100),
+    description: truncate(`Kickoff: ${formatKickoff(match.kickoff)}`, 100),
     value: String(match._id),
     default: selectedMatchId === String(match._id)
   }));

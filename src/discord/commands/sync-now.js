@@ -6,7 +6,7 @@ const ALLOWED_USER_ID = "386863309691027458";
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("sync-now")
-    .setDescription("Manual sync EPL/NBA ngay lập tức"),
+    .setDescription("Manual sync EPL/LaLiga/AFC/Asia/NBA ngay lap tuc"),
   async execute(interaction) {
     if (interaction.user.id !== ALLOWED_USER_ID) {
       return interaction.reply({

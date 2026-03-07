@@ -17,20 +17,20 @@ function formatGoals(goals) {
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName("live-epl")
-    .setDescription("List live EPL/football matches"),
+    .setName("live-laliga")
+    .setDescription("List live LaLiga matches"),
   async execute(interaction) {
     const matches = await Match.find({
       sport: "football",
-      league: "epl",
+      league: "laliga",
       status: "open",
       isLive: true
     }).sort({ kickoff: 1 });
 
     if (matches.length === 0) {
       const embed = buildEmbed({
-        title: "No live EPL matches ⏳",
-        description: "No EPL/football games are live right now. 📴",
+        title: "No live LaLiga matches ⏳",
+        description: "No LaLiga games are live right now. 📴",
         color: 0xf36c5c
       });
       return interaction.reply({ embeds: [embed] });
@@ -52,7 +52,7 @@ module.exports = {
       .join("\n\n");
 
     const embed = buildEmbed({
-      title: "Live EPL matches 🔴",
+      title: "Live LaLiga matches 🔴",
       description,
       color: 0xf36c5c
     });

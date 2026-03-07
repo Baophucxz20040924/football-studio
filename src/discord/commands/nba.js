@@ -11,6 +11,7 @@ module.exports = {
   async execute(interaction) {
     const matches = await Match.find({
       sport: "basketball",
+      league: "nba",
       status: "open",
       betLocked: { $ne: true },
       kickoff: { $gt: new Date() }

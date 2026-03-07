@@ -43,6 +43,7 @@ module.exports = createQuickBetCommand({
   commandName: "bet-epl",
   commandDescription: "Đặt cược EPL",
   sport: "football",
+  league: "epl",
   noMatchMessage: "No football matches are open for betting right now.",
   panelTitle: "Bet EPL 🏆",
   sessionExpiredMessage: "Session expired. Please run /bet-epl again.",

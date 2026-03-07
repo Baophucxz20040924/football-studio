@@ -40,7 +40,18 @@ module.exports = {
     const embeds = visibleBets.map((b) => {
       const match = matchMap.get(String(b.matchId));
       const sport = match?.sport === "basketball" ? "basketball" : "football";
-      const sportLabel = sport === "basketball" ? "🏀 NBA" : "⚽ Football";
+      const league = String(match?.league || "").toLowerCase();
+      const sportLabel = sport === "basketball"
+        ? "🏀 NBA"
+        : league === "laliga"
+          ? "⚽ LaLiga"
+          : league === "afc"
+            ? "⚽ AFC Champions"
+            : league === "afc_asian_cup"
+              ? "⚽ AFC Asian Cup"
+              : league === "ksa1"
+                ? "⚽ Saudi Pro League"
+            : "⚽ EPL";
       const label = match ? `${match.homeTeam} vs ${match.awayTeam}` : "Match";
       const score = match ? `${match.scoreHome ?? 0}-${match.scoreAway ?? 0}` : "-";
       const corner = sport === "football" && match

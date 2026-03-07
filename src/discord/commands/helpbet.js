@@ -4,13 +4,16 @@ const { buildEmbed } = require("./utils");
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("helpbet")
-    .setDescription("Hướng dẫn đặt cược bằng /bet-epl và /bet-nba"),
+    .setDescription("Huong dan dat cuoc bang cac lenh /bet-*"),
   async execute(interaction) {
     const description = [
       "**🎯 BET - Hướng dẫn nhanh**",
       "",
       "**Lệnh đặt cược:**",
       "`/bet-epl` - Cược nhanh cho EPL/football",
+      "`/bet-laliga` - Cược nhanh cho LaLiga",
+      "`/bet-afc` - Cược nhanh cho AFC Champions",
+      "`/bet-asia` - Cược nhanh cho AFC Asian Cup + Saudi Pro League",
       "`/bet-nba` - Cược nhanh cho NBA",
       "",
       "**Luồng thao tác:**",

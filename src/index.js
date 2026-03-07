@@ -36,6 +36,46 @@ const ESPN_EPL_PREMATCH_SYNC_NEAR_INTERVAL_MS = Number(process.env.ESPN_EPL_PREM
 const ESPN_EPL_PREMATCH_NEAR_WINDOW_MS = Number(process.env.ESPN_EPL_PREMATCH_NEAR_WINDOW_MS || 2 * 60 * 60_000);
 const ESPN_EPL_SYNC_DAYS_AHEAD = Number(process.env.ESPN_EPL_SYNC_DAYS_AHEAD || 7);
 const ESPN_EPL_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/scoreboard";
+const ESPN_LALIGA_AUTO_SYNC_ENABLED = process.env.ESPN_LALIGA_AUTO_SYNC_ENABLED !== "false";
+const ESPN_LALIGA_AUTO_CLOSE_ENABLED = process.env.ESPN_LALIGA_AUTO_CLOSE_ENABLED !== "false";
+const ESPN_LALIGA_CREATE_SYNC_INTERVAL_MS = Number(process.env.ESPN_LALIGA_CREATE_SYNC_INTERVAL_MS || 30 * 60_000);
+const ESPN_LALIGA_LIVE_SYNC_INTERVAL_MS = Number(process.env.ESPN_LALIGA_LIVE_SYNC_INTERVAL_MS || 2 * 60_000);
+const ESPN_LALIGA_PREMATCH_SYNC_CHECK_INTERVAL_MS = Number(process.env.ESPN_LALIGA_PREMATCH_SYNC_CHECK_INTERVAL_MS || 10 * 60_000);
+const ESPN_LALIGA_PREMATCH_SYNC_FAR_INTERVAL_MS = Number(process.env.ESPN_LALIGA_PREMATCH_SYNC_FAR_INTERVAL_MS || 2 * 60 * 60_000);
+const ESPN_LALIGA_PREMATCH_SYNC_NEAR_INTERVAL_MS = Number(process.env.ESPN_LALIGA_PREMATCH_SYNC_NEAR_INTERVAL_MS || 60 * 60_000);
+const ESPN_LALIGA_PREMATCH_NEAR_WINDOW_MS = Number(process.env.ESPN_LALIGA_PREMATCH_NEAR_WINDOW_MS || 2 * 60 * 60_000);
+const ESPN_LALIGA_SYNC_DAYS_AHEAD = Number(process.env.ESPN_LALIGA_SYNC_DAYS_AHEAD || 7);
+const ESPN_LALIGA_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/soccer/esp.1/scoreboard";
+const ESPN_AFC_AUTO_SYNC_ENABLED = process.env.ESPN_AFC_AUTO_SYNC_ENABLED !== "false";
+const ESPN_AFC_AUTO_CLOSE_ENABLED = process.env.ESPN_AFC_AUTO_CLOSE_ENABLED !== "false";
+const ESPN_AFC_CREATE_SYNC_INTERVAL_MS = Number(process.env.ESPN_AFC_CREATE_SYNC_INTERVAL_MS || 30 * 60_000);
+const ESPN_AFC_LIVE_SYNC_INTERVAL_MS = Number(process.env.ESPN_AFC_LIVE_SYNC_INTERVAL_MS || 2 * 60_000);
+const ESPN_AFC_PREMATCH_SYNC_CHECK_INTERVAL_MS = Number(process.env.ESPN_AFC_PREMATCH_SYNC_CHECK_INTERVAL_MS || 10 * 60_000);
+const ESPN_AFC_PREMATCH_SYNC_FAR_INTERVAL_MS = Number(process.env.ESPN_AFC_PREMATCH_SYNC_FAR_INTERVAL_MS || 2 * 60 * 60_000);
+const ESPN_AFC_PREMATCH_SYNC_NEAR_INTERVAL_MS = Number(process.env.ESPN_AFC_PREMATCH_SYNC_NEAR_INTERVAL_MS || 60 * 60_000);
+const ESPN_AFC_PREMATCH_NEAR_WINDOW_MS = Number(process.env.ESPN_AFC_PREMATCH_NEAR_WINDOW_MS || 2 * 60 * 60_000);
+const ESPN_AFC_SYNC_DAYS_AHEAD = Number(process.env.ESPN_AFC_SYNC_DAYS_AHEAD || 7);
+const ESPN_AFC_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/soccer/afc.champions/scoreboard";
+const ESPN_AFC_ASIAN_CUP_AUTO_SYNC_ENABLED = process.env.ESPN_AFC_ASIAN_CUP_AUTO_SYNC_ENABLED !== "false";
+const ESPN_AFC_ASIAN_CUP_AUTO_CLOSE_ENABLED = process.env.ESPN_AFC_ASIAN_CUP_AUTO_CLOSE_ENABLED !== "false";
+const ESPN_AFC_ASIAN_CUP_CREATE_SYNC_INTERVAL_MS = Number(process.env.ESPN_AFC_ASIAN_CUP_CREATE_SYNC_INTERVAL_MS || 30 * 60_000);
+const ESPN_AFC_ASIAN_CUP_LIVE_SYNC_INTERVAL_MS = Number(process.env.ESPN_AFC_ASIAN_CUP_LIVE_SYNC_INTERVAL_MS || 2 * 60_000);
+const ESPN_AFC_ASIAN_CUP_PREMATCH_SYNC_CHECK_INTERVAL_MS = Number(process.env.ESPN_AFC_ASIAN_CUP_PREMATCH_SYNC_CHECK_INTERVAL_MS || 10 * 60_000);
+const ESPN_AFC_ASIAN_CUP_PREMATCH_SYNC_FAR_INTERVAL_MS = Number(process.env.ESPN_AFC_ASIAN_CUP_PREMATCH_SYNC_FAR_INTERVAL_MS || 2 * 60 * 60_000);
+const ESPN_AFC_ASIAN_CUP_PREMATCH_SYNC_NEAR_INTERVAL_MS = Number(process.env.ESPN_AFC_ASIAN_CUP_PREMATCH_SYNC_NEAR_INTERVAL_MS || 60 * 60_000);
+const ESPN_AFC_ASIAN_CUP_PREMATCH_NEAR_WINDOW_MS = Number(process.env.ESPN_AFC_ASIAN_CUP_PREMATCH_NEAR_WINDOW_MS || 2 * 60 * 60_000);
+const ESPN_AFC_ASIAN_CUP_SYNC_DAYS_AHEAD = Number(process.env.ESPN_AFC_ASIAN_CUP_SYNC_DAYS_AHEAD || 7);
+const ESPN_AFC_ASIAN_CUP_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/soccer/afc.asian.cup/scoreboard";
+const ESPN_KSA1_AUTO_SYNC_ENABLED = process.env.ESPN_KSA1_AUTO_SYNC_ENABLED !== "false";
+const ESPN_KSA1_AUTO_CLOSE_ENABLED = process.env.ESPN_KSA1_AUTO_CLOSE_ENABLED !== "false";
+const ESPN_KSA1_CREATE_SYNC_INTERVAL_MS = Number(process.env.ESPN_KSA1_CREATE_SYNC_INTERVAL_MS || 30 * 60_000);
+const ESPN_KSA1_LIVE_SYNC_INTERVAL_MS = Number(process.env.ESPN_KSA1_LIVE_SYNC_INTERVAL_MS || 2 * 60_000);
+const ESPN_KSA1_PREMATCH_SYNC_CHECK_INTERVAL_MS = Number(process.env.ESPN_KSA1_PREMATCH_SYNC_CHECK_INTERVAL_MS || 10 * 60_000);
+const ESPN_KSA1_PREMATCH_SYNC_FAR_INTERVAL_MS = Number(process.env.ESPN_KSA1_PREMATCH_SYNC_FAR_INTERVAL_MS || 2 * 60 * 60_000);
+const ESPN_KSA1_PREMATCH_SYNC_NEAR_INTERVAL_MS = Number(process.env.ESPN_KSA1_PREMATCH_SYNC_NEAR_INTERVAL_MS || 60 * 60_000);
+const ESPN_KSA1_PREMATCH_NEAR_WINDOW_MS = Number(process.env.ESPN_KSA1_PREMATCH_NEAR_WINDOW_MS || 2 * 60 * 60_000);
+const ESPN_KSA1_SYNC_DAYS_AHEAD = Number(process.env.ESPN_KSA1_SYNC_DAYS_AHEAD || 7);
+const ESPN_KSA1_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/soccer/ksa.1/scoreboard";
 const ESPN_NBA_AUTO_SYNC_ENABLED = process.env.ESPN_NBA_AUTO_SYNC_ENABLED !== "false";
 const ESPN_NBA_AUTO_CLOSE_ENABLED = process.env.ESPN_NBA_AUTO_CLOSE_ENABLED !== "false";
 const ESPN_NBA_CREATE_SYNC_INTERVAL_MS = Number(process.env.ESPN_NBA_CREATE_SYNC_INTERVAL_MS || 30 * 60_000);
@@ -76,6 +116,30 @@ let eplLiveSyncIntervalId = null;
 let eplCreateSyncInProgress = false;
 let eplPrematchSyncInProgress = false;
 let eplLiveSyncInProgress = false;
+let laligaCreateSyncIntervalId = null;
+let laligaPrematchSyncIntervalId = null;
+let laligaLiveSyncIntervalId = null;
+let laligaCreateSyncInProgress = false;
+let laligaPrematchSyncInProgress = false;
+let laligaLiveSyncInProgress = false;
+let afcCreateSyncIntervalId = null;
+let afcPrematchSyncIntervalId = null;
+let afcLiveSyncIntervalId = null;
+let afcCreateSyncInProgress = false;
+let afcPrematchSyncInProgress = false;
+let afcLiveSyncInProgress = false;
+let afcAsianCupCreateSyncIntervalId = null;
+let afcAsianCupPrematchSyncIntervalId = null;
+let afcAsianCupLiveSyncIntervalId = null;
+let afcAsianCupCreateSyncInProgress = false;
+let afcAsianCupPrematchSyncInProgress = false;
+let afcAsianCupLiveSyncInProgress = false;
+let ksa1CreateSyncIntervalId = null;
+let ksa1PrematchSyncIntervalId = null;
+let ksa1LiveSyncIntervalId = null;
+let ksa1CreateSyncInProgress = false;
+let ksa1PrematchSyncInProgress = false;
+let ksa1LiveSyncInProgress = false;
 let nbaCreateSyncIntervalId = null;
 let nbaPrematchSyncIntervalId = null;
 let nbaLiveSyncIntervalId = null;
@@ -553,7 +617,7 @@ function extractNbaOdds(competition) {
   return Array.from(dedupedByKey.values());
 }
 
-function buildMatchFromEspnEvent(event, { sport, oddsExtractor, eventIdPrefix = "" }) {
+function buildMatchFromEspnEvent(event, { sport, league, oddsExtractor, eventIdPrefix = "" }) {
   const competition = getCompetitionFromEvent(event);
   if (!competition) {
     return null;
@@ -589,6 +653,7 @@ function buildMatchFromEspnEvent(event, { sport, oddsExtractor, eventIdPrefix = 
   return {
     espnEventId: eventIdPrefix ? `${eventIdPrefix}:${rawEventId}` : rawEventId,
     sport,
+    league,
     state: String(state || "").toLowerCase(),
     homeTeam,
     awayTeam,
@@ -608,7 +673,60 @@ async function fetchEplScoreboardEvents(dates) {
 function buildEplMatchFromEspnEvent(event) {
   return buildMatchFromEspnEvent(event, {
     sport: "football",
+    league: "epl",
     oddsExtractor: extractEplOdds
+  });
+}
+
+async function fetchLaLigaScoreboardEvents(dates) {
+  return fetchScoreboardEvents(ESPN_LALIGA_SCOREBOARD_URL, dates);
+}
+
+function buildLaLigaMatchFromEspnEvent(event) {
+  return buildMatchFromEspnEvent(event, {
+    sport: "football",
+    league: "laliga",
+    oddsExtractor: extractEplOdds,
+    eventIdPrefix: "laliga"
+  });
+}
+
+async function fetchAfcScoreboardEvents(dates) {
+  return fetchScoreboardEvents(ESPN_AFC_SCOREBOARD_URL, dates);
+}
+
+function buildAfcMatchFromEspnEvent(event) {
+  return buildMatchFromEspnEvent(event, {
+    sport: "football",
+    league: "afc",
+    oddsExtractor: extractEplOdds,
+    eventIdPrefix: "afc"
+  });
+}
+
+async function fetchAfcAsianCupScoreboardEvents(dates) {
+  return fetchScoreboardEvents(ESPN_AFC_ASIAN_CUP_SCOREBOARD_URL, dates);
+}
+
+function buildAfcAsianCupMatchFromEspnEvent(event) {
+  return buildMatchFromEspnEvent(event, {
+    sport: "football",
+    league: "afc_asian_cup",
+    oddsExtractor: extractEplOdds,
+    eventIdPrefix: "afc_asian_cup"
+  });
+}
+
+async function fetchKsa1ScoreboardEvents(dates) {
+  return fetchScoreboardEvents(ESPN_KSA1_SCOREBOARD_URL, dates);
+}
+
+function buildKsa1MatchFromEspnEvent(event) {
+  return buildMatchFromEspnEvent(event, {
+    sport: "football",
+    league: "ksa1",
+    oddsExtractor: extractEplOdds,
+    eventIdPrefix: "ksa1"
   });
 }
 
@@ -619,6 +737,7 @@ async function fetchNbaScoreboardEvents(dates) {
 function buildNbaMatchFromEspnEvent(event) {
   return buildMatchFromEspnEvent(event, {
     sport: "basketball",
+    league: "nba",
     oddsExtractor: extractNbaOdds,
     eventIdPrefix: "nba"
   });
@@ -766,12 +885,13 @@ async function syncEplCreateMatches() {
         continue;
       }
 
-      const existing = await Match.findOne({ espnEventId: incoming.espnEventId, sport: "football" });
+      const existing = await Match.findOne({ espnEventId: incoming.espnEventId, sport: "football", league: "epl" });
       if (!existing) {
         const matchCode = await generateMatchCode();
         await Match.create({
           espnEventId: incoming.espnEventId,
           sport: "football",
+          league: "epl",
           matchCode,
           homeTeam: incoming.homeTeam,
           awayTeam: incoming.awayTeam,
@@ -842,6 +962,7 @@ async function syncEplPrematchOdds({ forcePrematch = false } = {}) {
     const now = new Date();
     const candidates = await Match.find({
       sport: "football",
+      league: "epl",
       status: "open",
       espnEventId: { $exists: true, $ne: "" },
       kickoff: { $gt: now }
@@ -927,6 +1048,7 @@ async function syncEplLiveOddsAndScores() {
     const now = new Date();
     const candidates = await Match.find({
       sport: "football",
+      league: "epl",
       status: "open",
       espnEventId: { $exists: true, $ne: "" },
       kickoff: { $lte: now }
@@ -1055,6 +1177,1266 @@ function startEplPrematchSyncScheduler() {
   }, ESPN_EPL_PREMATCH_SYNC_CHECK_INTERVAL_MS);
 }
 
+async function syncLaLigaCreateMatches() {
+  if (!ESPN_LALIGA_AUTO_SYNC_ENABLED) {
+    return;
+  }
+
+  if (laligaCreateSyncInProgress) {
+    return;
+  }
+
+  laligaCreateSyncInProgress = true;
+
+  try {
+    const dates = getEplDateRangeToken(ESPN_LALIGA_SYNC_DAYS_AHEAD);
+    const events = await fetchLaLigaScoreboardEvents(dates);
+    let created = 0;
+    let updated = 0;
+
+    for (const event of events) {
+      const incoming = buildLaLigaMatchFromEspnEvent(event);
+      if (!incoming?.espnEventId) {
+        continue;
+      }
+
+      const existing = await Match.findOne({ espnEventId: incoming.espnEventId, sport: "football", league: "laliga" });
+      if (!existing) {
+        const matchCode = await generateMatchCode();
+        await Match.create({
+          espnEventId: incoming.espnEventId,
+          sport: "football",
+          league: "laliga",
+          matchCode,
+          homeTeam: incoming.homeTeam,
+          awayTeam: incoming.awayTeam,
+          stadium: incoming.stadium,
+          kickoff: incoming.kickoff,
+          scoreHome: incoming.hasLiveScore ? incoming.scoreHome : 0,
+          scoreAway: incoming.hasLiveScore ? incoming.scoreAway : 0,
+          odds: incoming.odds,
+          status: "open"
+        });
+        created += 1;
+        continue;
+      }
+
+      if (existing.status !== "open") {
+        continue;
+      }
+
+      let changed = false;
+
+      if (existing.homeTeam !== incoming.homeTeam) {
+        existing.homeTeam = incoming.homeTeam;
+        changed = true;
+      }
+
+      if (existing.awayTeam !== incoming.awayTeam) {
+        existing.awayTeam = incoming.awayTeam;
+        changed = true;
+      }
+
+      const incomingStadium = incoming.stadium || "";
+      if ((existing.stadium || "") !== incomingStadium) {
+        existing.stadium = incomingStadium;
+        changed = true;
+      }
+
+      if (new Date(existing.kickoff).getTime() !== incoming.kickoff.getTime()) {
+        existing.kickoff = incoming.kickoff;
+        changed = true;
+      }
+
+      if (changed) {
+        await existing.save();
+        updated += 1;
+      }
+    }
+
+    if (created > 0 || updated > 0) {
+      console.log(`LaLiga create sync complete: created ${created} match(es), updated ${updated} match(es).`);
+    }
+  } finally {
+    laligaCreateSyncInProgress = false;
+  }
+}
+
+async function syncLaLigaPrematchOdds({ forcePrematch = false } = {}) {
+  if (!ESPN_LALIGA_AUTO_SYNC_ENABLED) {
+    return;
+  }
+
+  if (laligaPrematchSyncInProgress) {
+    return;
+  }
+
+  laligaPrematchSyncInProgress = true;
+
+  try {
+    const now = new Date();
+    const candidates = await Match.find({
+      sport: "football",
+      league: "laliga",
+      status: "open",
+      espnEventId: { $exists: true, $ne: "" },
+      kickoff: { $gt: now }
+    });
+
+    if (candidates.length === 0) {
+      return;
+    }
+
+    const dates = getEplDateRangeToken(ESPN_LALIGA_SYNC_DAYS_AHEAD);
+    const events = await fetchLaLigaScoreboardEvents(dates);
+    const incomingByEventId = new Map();
+
+    for (const event of events) {
+      const incoming = buildLaLigaMatchFromEspnEvent(event);
+      if (incoming?.espnEventId) {
+        incomingByEventId.set(incoming.espnEventId, incoming);
+      }
+    }
+
+    let checked = 0;
+    let oddsUpdated = 0;
+
+    for (const match of candidates) {
+      const incoming = incomingByEventId.get(match.espnEventId);
+      if (!incoming || incoming.odds.length === 0) {
+        continue;
+      }
+
+      const kickoffTime = new Date(match.kickoff).getTime();
+      if (!Number.isFinite(kickoffTime) || kickoffTime <= Date.now()) {
+        continue;
+      }
+
+      const timeToKickoffMs = kickoffTime - Date.now();
+      const requiredIntervalMs = timeToKickoffMs <= ESPN_LALIGA_PREMATCH_NEAR_WINDOW_MS
+        ? ESPN_LALIGA_PREMATCH_SYNC_NEAR_INTERVAL_MS
+        : ESPN_LALIGA_PREMATCH_SYNC_FAR_INTERVAL_MS;
+
+      const lastSyncedAt = match.prematchOddsSyncedAt ? new Date(match.prematchOddsSyncedAt) : null;
+      const lastSyncedMs = lastSyncedAt && Number.isFinite(lastSyncedAt.getTime())
+        ? lastSyncedAt.getTime()
+        : null;
+
+      if (!forcePrematch && lastSyncedMs && (Date.now() - lastSyncedMs) < requiredIntervalMs) {
+        continue;
+      }
+
+      checked += 1;
+      const beforeOdds = JSON.stringify(match.odds || []);
+      const nextOdds = JSON.stringify(incoming.odds);
+
+      match.odds = incoming.odds;
+      match.prematchOddsSyncedAt = now;
+
+      if (beforeOdds !== nextOdds) {
+        oddsUpdated += 1;
+      }
+
+      await match.save();
+    }
+
+    if (checked > 0 || oddsUpdated > 0) {
+      console.log(`LaLiga prematch odds sync: checked ${checked}, updated ${oddsUpdated}.`);
+    }
+  } finally {
+    laligaPrematchSyncInProgress = false;
+  }
+}
+
+async function syncLaLigaLiveOddsAndScores() {
+  if (!ESPN_LALIGA_AUTO_SYNC_ENABLED) {
+    return;
+  }
+
+  if (laligaLiveSyncInProgress) {
+    return;
+  }
+
+  laligaLiveSyncInProgress = true;
+
+  try {
+    const now = new Date();
+    const candidates = await Match.find({
+      sport: "football",
+      league: "laliga",
+      status: "open",
+      espnEventId: { $exists: true, $ne: "" },
+      kickoff: { $lte: now }
+    });
+
+    if (candidates.length === 0) {
+      return;
+    }
+
+    const dates = getEplDateRangeTokenWithOffsets(-1, 1);
+    const events = await fetchLaLigaScoreboardEvents(dates);
+    const incomingByEventId = new Map();
+
+    for (const event of events) {
+      const incoming = buildLaLigaMatchFromEspnEvent(event);
+      if (incoming?.espnEventId) {
+        incomingByEventId.set(incoming.espnEventId, incoming);
+      }
+    }
+
+    let updated = 0;
+    let scoresUpdated = 0;
+    let autoClosed = 0;
+
+    for (const match of candidates) {
+      const incoming = incomingByEventId.get(match.espnEventId);
+      if (!incoming) {
+        continue;
+      }
+
+      let changed = false;
+
+      match.homeTeam = incoming.homeTeam;
+      match.awayTeam = incoming.awayTeam;
+      match.stadium = incoming.stadium || match.stadium;
+      match.kickoff = incoming.kickoff;
+
+      if (incoming.hasLiveScore) {
+        const scoreChanged = match.scoreHome !== incoming.scoreHome || match.scoreAway !== incoming.scoreAway;
+        match.scoreHome = incoming.scoreHome;
+        match.scoreAway = incoming.scoreAway;
+        if (scoreChanged) {
+          scoresUpdated += 1;
+        }
+        changed = true;
+      }
+
+      const isPostState = incoming.state === "post";
+      if (ESPN_LALIGA_AUTO_CLOSE_ENABLED && isPostState) {
+        const winnerKeys = deriveWinnerKeysByScore(incoming.scoreHome, incoming.scoreAway, match.odds);
+        if (winnerKeys.length > 0) {
+          await closeMatchAndSettleBets(match, {
+            winnerKeys,
+            scoreHome: incoming.scoreHome,
+            scoreAway: incoming.scoreAway
+          });
+          autoClosed += 1;
+          continue;
+        }
+      }
+
+      if (changed) {
+        await match.save();
+        updated += 1;
+      }
+    }
+
+    if (updated > 0 || scoresUpdated > 0 || autoClosed > 0) {
+      console.log(
+        `LaLiga live sync complete: updated ${updated}, scores updated ${scoresUpdated}, auto closed ${autoClosed}.`
+      );
+    }
+  } finally {
+    laligaLiveSyncInProgress = false;
+  }
+}
+
+function startLaLigaCreateSyncScheduler() {
+  if (laligaCreateSyncIntervalId) {
+    clearInterval(laligaCreateSyncIntervalId);
+  }
+
+  if (!ESPN_LALIGA_AUTO_SYNC_ENABLED) {
+    console.log("LaLiga auto-sync is disabled (ESPN_LALIGA_AUTO_SYNC_ENABLED=false).");
+    return;
+  }
+
+  laligaCreateSyncIntervalId = setInterval(() => {
+    void syncLaLigaCreateMatches().catch((error) => {
+      console.error("Failed to create LaLiga matches from ESPN:", error);
+    });
+  }, ESPN_LALIGA_CREATE_SYNC_INTERVAL_MS);
+}
+
+function startLaLigaLiveSyncScheduler() {
+  if (laligaLiveSyncIntervalId) {
+    clearInterval(laligaLiveSyncIntervalId);
+  }
+
+  if (!ESPN_LALIGA_AUTO_SYNC_ENABLED) {
+    console.log("LaLiga auto-sync is disabled (ESPN_LALIGA_AUTO_SYNC_ENABLED=false).");
+    return;
+  }
+
+  laligaLiveSyncIntervalId = setInterval(() => {
+    void syncLaLigaLiveOddsAndScores().catch((error) => {
+      console.error("Failed to sync LaLiga live odds/score from ESPN:", error);
+    });
+  }, ESPN_LALIGA_LIVE_SYNC_INTERVAL_MS);
+}
+
+function startLaLigaPrematchSyncScheduler() {
+  if (laligaPrematchSyncIntervalId) {
+    clearInterval(laligaPrematchSyncIntervalId);
+  }
+
+  if (!ESPN_LALIGA_AUTO_SYNC_ENABLED) {
+    console.log("LaLiga auto-sync is disabled (ESPN_LALIGA_AUTO_SYNC_ENABLED=false).");
+    return;
+  }
+
+  laligaPrematchSyncIntervalId = setInterval(() => {
+    void syncLaLigaPrematchOdds().catch((error) => {
+      console.error("Failed to sync LaLiga prematch odds from ESPN:", error);
+    });
+  }, ESPN_LALIGA_PREMATCH_SYNC_CHECK_INTERVAL_MS);
+}
+
+async function syncAfcCreateMatches() {
+  if (!ESPN_AFC_AUTO_SYNC_ENABLED) {
+    return;
+  }
+
+  if (afcCreateSyncInProgress) {
+    return;
+  }
+
+  afcCreateSyncInProgress = true;
+
+  try {
+    const dates = getEplDateRangeToken(ESPN_AFC_SYNC_DAYS_AHEAD);
+    const events = await fetchAfcScoreboardEvents(dates);
+    let created = 0;
+    let updated = 0;
+
+    for (const event of events) {
+      const incoming = buildAfcMatchFromEspnEvent(event);
+      if (!incoming?.espnEventId) {
+        continue;
+      }
+
+      const existing = await Match.findOne({ espnEventId: incoming.espnEventId, sport: "football", league: "afc" });
+      if (!existing) {
+        const matchCode = await generateMatchCode();
+        await Match.create({
+          espnEventId: incoming.espnEventId,
+          sport: "football",
+          league: "afc",
+          matchCode,
+          homeTeam: incoming.homeTeam,
+          awayTeam: incoming.awayTeam,
+          stadium: incoming.stadium,
+          kickoff: incoming.kickoff,
+          scoreHome: incoming.hasLiveScore ? incoming.scoreHome : 0,
+          scoreAway: incoming.hasLiveScore ? incoming.scoreAway : 0,
+          odds: incoming.odds,
+          status: "open"
+        });
+        created += 1;
+        continue;
+      }
+
+      if (existing.status !== "open") {
+        continue;
+      }
+
+      let changed = false;
+
+      if (existing.homeTeam !== incoming.homeTeam) {
+        existing.homeTeam = incoming.homeTeam;
+        changed = true;
+      }
+
+      if (existing.awayTeam !== incoming.awayTeam) {
+        existing.awayTeam = incoming.awayTeam;
+        changed = true;
+      }
+
+      const incomingStadium = incoming.stadium || "";
+      if ((existing.stadium || "") !== incomingStadium) {
+        existing.stadium = incomingStadium;
+        changed = true;
+      }
+
+      if (new Date(existing.kickoff).getTime() !== incoming.kickoff.getTime()) {
+        existing.kickoff = incoming.kickoff;
+        changed = true;
+      }
+
+      if (changed) {
+        await existing.save();
+        updated += 1;
+      }
+    }
+
+    if (created > 0 || updated > 0) {
+      console.log(`AFC create sync complete: created ${created} match(es), updated ${updated} match(es).`);
+    }
+  } finally {
+    afcCreateSyncInProgress = false;
+  }
+}
+
+async function syncAfcPrematchOdds({ forcePrematch = false } = {}) {
+  if (!ESPN_AFC_AUTO_SYNC_ENABLED) {
+    return;
+  }
+
+  if (afcPrematchSyncInProgress) {
+    return;
+  }
+
+  afcPrematchSyncInProgress = true;
+
+  try {
+    const now = new Date();
+    const candidates = await Match.find({
+      sport: "football",
+      league: "afc",
+      status: "open",
+      espnEventId: { $exists: true, $ne: "" },
+      kickoff: { $gt: now }
+    });
+
+    if (candidates.length === 0) {
+      return;
+    }
+
+    const dates = getEplDateRangeToken(ESPN_AFC_SYNC_DAYS_AHEAD);
+    const events = await fetchAfcScoreboardEvents(dates);
+    const incomingByEventId = new Map();
+
+    for (const event of events) {
+      const incoming = buildAfcMatchFromEspnEvent(event);
+      if (incoming?.espnEventId) {
+        incomingByEventId.set(incoming.espnEventId, incoming);
+      }
+    }
+
+    let checked = 0;
+    let oddsUpdated = 0;
+
+    for (const match of candidates) {
+      const incoming = incomingByEventId.get(match.espnEventId);
+      if (!incoming || incoming.odds.length === 0) {
+        continue;
+      }
+
+      const kickoffTime = new Date(match.kickoff).getTime();
+      if (!Number.isFinite(kickoffTime) || kickoffTime <= Date.now()) {
+        continue;
+      }
+
+      const timeToKickoffMs = kickoffTime - Date.now();
+      const requiredIntervalMs = timeToKickoffMs <= ESPN_AFC_PREMATCH_NEAR_WINDOW_MS
+        ? ESPN_AFC_PREMATCH_SYNC_NEAR_INTERVAL_MS
+        : ESPN_AFC_PREMATCH_SYNC_FAR_INTERVAL_MS;
+
+      const lastSyncedAt = match.prematchOddsSyncedAt ? new Date(match.prematchOddsSyncedAt) : null;
+      const lastSyncedMs = lastSyncedAt && Number.isFinite(lastSyncedAt.getTime())
+        ? lastSyncedAt.getTime()
+        : null;
+
+      if (!forcePrematch && lastSyncedMs && (Date.now() - lastSyncedMs) < requiredIntervalMs) {
+        continue;
+      }
+
+      checked += 1;
+      const beforeOdds = JSON.stringify(match.odds || []);
+      const nextOdds = JSON.stringify(incoming.odds);
+
+      match.odds = incoming.odds;
+      match.prematchOddsSyncedAt = now;
+
+      if (beforeOdds !== nextOdds) {
+        oddsUpdated += 1;
+      }
+
+      await match.save();
+    }
+
+    if (checked > 0 || oddsUpdated > 0) {
+      console.log(`AFC prematch odds sync: checked ${checked}, updated ${oddsUpdated}.`);
+    }
+  } finally {
+    afcPrematchSyncInProgress = false;
+  }
+}
+
+async function syncAfcLiveOddsAndScores() {
+  if (!ESPN_AFC_AUTO_SYNC_ENABLED) {
+    return;
+  }
+
+  if (afcLiveSyncInProgress) {
+    return;
+  }
+
+  afcLiveSyncInProgress = true;
+
+  try {
+    const now = new Date();
+    const candidates = await Match.find({
+      sport: "football",
+      league: "afc",
+      status: "open",
+      espnEventId: { $exists: true, $ne: "" },
+      kickoff: { $lte: now }
+    });
+
+    if (candidates.length === 0) {
+      return;
+    }
+
+    const dates = getEplDateRangeTokenWithOffsets(-1, 1);
+    const events = await fetchAfcScoreboardEvents(dates);
+    const incomingByEventId = new Map();
+
+    for (const event of events) {
+      const incoming = buildAfcMatchFromEspnEvent(event);
+      if (incoming?.espnEventId) {
+        incomingByEventId.set(incoming.espnEventId, incoming);
+      }
+    }
+
+    let updated = 0;
+    let scoresUpdated = 0;
+    let autoClosed = 0;
+
+    for (const match of candidates) {
+      const incoming = incomingByEventId.get(match.espnEventId);
+      if (!incoming) {
+        continue;
+      }
+
+      let changed = false;
+
+      match.homeTeam = incoming.homeTeam;
+      match.awayTeam = incoming.awayTeam;
+      match.stadium = incoming.stadium || match.stadium;
+      match.kickoff = incoming.kickoff;
+
+      if (incoming.hasLiveScore) {
+        const scoreChanged = match.scoreHome !== incoming.scoreHome || match.scoreAway !== incoming.scoreAway;
+        match.scoreHome = incoming.scoreHome;
+        match.scoreAway = incoming.scoreAway;
+        if (scoreChanged) {
+          scoresUpdated += 1;
+        }
+        changed = true;
+      }
+
+      const isPostState = incoming.state === "post";
+      if (ESPN_AFC_AUTO_CLOSE_ENABLED && isPostState) {
+        const winnerKeys = deriveWinnerKeysByScore(incoming.scoreHome, incoming.scoreAway, match.odds);
+        if (winnerKeys.length > 0) {
+          await closeMatchAndSettleBets(match, {
+            winnerKeys,
+            scoreHome: incoming.scoreHome,
+            scoreAway: incoming.scoreAway
+          });
+          autoClosed += 1;
+          continue;
+        }
+      }
+
+      if (changed) {
+        await match.save();
+        updated += 1;
+      }
+    }
+
+    if (updated > 0 || scoresUpdated > 0 || autoClosed > 0) {
+      console.log(
+        `AFC live sync complete: updated ${updated}, scores updated ${scoresUpdated}, auto closed ${autoClosed}.`
+      );
+    }
+  } finally {
+    afcLiveSyncInProgress = false;
+  }
+}
+
+function startAfcCreateSyncScheduler() {
+  if (afcCreateSyncIntervalId) {
+    clearInterval(afcCreateSyncIntervalId);
+  }
+
+  if (!ESPN_AFC_AUTO_SYNC_ENABLED) {
+    console.log("AFC auto-sync is disabled (ESPN_AFC_AUTO_SYNC_ENABLED=false).");
+    return;
+  }
+
+  afcCreateSyncIntervalId = setInterval(() => {
+    void syncAfcCreateMatches().catch((error) => {
+      console.error("Failed to create AFC matches from ESPN:", error);
+    });
+  }, ESPN_AFC_CREATE_SYNC_INTERVAL_MS);
+}
+
+function startAfcLiveSyncScheduler() {
+  if (afcLiveSyncIntervalId) {
+    clearInterval(afcLiveSyncIntervalId);
+  }
+
+  if (!ESPN_AFC_AUTO_SYNC_ENABLED) {
+    console.log("AFC auto-sync is disabled (ESPN_AFC_AUTO_SYNC_ENABLED=false).");
+    return;
+  }
+
+  afcLiveSyncIntervalId = setInterval(() => {
+    void syncAfcLiveOddsAndScores().catch((error) => {
+      console.error("Failed to sync AFC live odds/score from ESPN:", error);
+    });
+  }, ESPN_AFC_LIVE_SYNC_INTERVAL_MS);
+}
+
+function startAfcPrematchSyncScheduler() {
+  if (afcPrematchSyncIntervalId) {
+    clearInterval(afcPrematchSyncIntervalId);
+  }
+
+  if (!ESPN_AFC_AUTO_SYNC_ENABLED) {
+    console.log("AFC auto-sync is disabled (ESPN_AFC_AUTO_SYNC_ENABLED=false).");
+    return;
+  }
+
+  afcPrematchSyncIntervalId = setInterval(() => {
+    void syncAfcPrematchOdds().catch((error) => {
+      console.error("Failed to sync AFC prematch odds from ESPN:", error);
+    });
+  }, ESPN_AFC_PREMATCH_SYNC_CHECK_INTERVAL_MS);
+}
+
+async function syncAfcAsianCupCreateMatches() {
+  if (!ESPN_AFC_ASIAN_CUP_AUTO_SYNC_ENABLED) {
+    return;
+  }
+
+  if (afcAsianCupCreateSyncInProgress) {
+    return;
+  }
+
+  afcAsianCupCreateSyncInProgress = true;
+
+  try {
+    const dates = getEplDateRangeToken(ESPN_AFC_ASIAN_CUP_SYNC_DAYS_AHEAD);
+    const events = await fetchAfcAsianCupScoreboardEvents(dates);
+    let created = 0;
+    let updated = 0;
+
+    for (const event of events) {
+      const incoming = buildAfcAsianCupMatchFromEspnEvent(event);
+      if (!incoming?.espnEventId) {
+        continue;
+      }
+
+      const existing = await Match.findOne({ espnEventId: incoming.espnEventId, sport: "football", league: "afc_asian_cup" });
+      if (!existing) {
+        const matchCode = await generateMatchCode();
+        await Match.create({
+          espnEventId: incoming.espnEventId,
+          sport: "football",
+          league: "afc_asian_cup",
+          matchCode,
+          homeTeam: incoming.homeTeam,
+          awayTeam: incoming.awayTeam,
+          stadium: incoming.stadium,
+          kickoff: incoming.kickoff,
+          scoreHome: incoming.hasLiveScore ? incoming.scoreHome : 0,
+          scoreAway: incoming.hasLiveScore ? incoming.scoreAway : 0,
+          odds: incoming.odds,
+          status: "open"
+        });
+        created += 1;
+        continue;
+      }
+
+      if (existing.status !== "open") {
+        continue;
+      }
+
+      let changed = false;
+
+      if (existing.homeTeam !== incoming.homeTeam) {
+        existing.homeTeam = incoming.homeTeam;
+        changed = true;
+      }
+
+      if (existing.awayTeam !== incoming.awayTeam) {
+        existing.awayTeam = incoming.awayTeam;
+        changed = true;
+      }
+
+      const incomingStadium = incoming.stadium || "";
+      if ((existing.stadium || "") !== incomingStadium) {
+        existing.stadium = incomingStadium;
+        changed = true;
+      }
+
+      if (new Date(existing.kickoff).getTime() !== incoming.kickoff.getTime()) {
+        existing.kickoff = incoming.kickoff;
+        changed = true;
+      }
+
+      if (changed) {
+        await existing.save();
+        updated += 1;
+      }
+    }
+
+    if (created > 0 || updated > 0) {
+      console.log(`AFC Asian Cup create sync complete: created ${created} match(es), updated ${updated} match(es).`);
+    }
+  } finally {
+    afcAsianCupCreateSyncInProgress = false;
+  }
+}
+
+async function syncAfcAsianCupPrematchOdds({ forcePrematch = false } = {}) {
+  if (!ESPN_AFC_ASIAN_CUP_AUTO_SYNC_ENABLED) {
+    return;
+  }
+
+  if (afcAsianCupPrematchSyncInProgress) {
+    return;
+  }
+
+  afcAsianCupPrematchSyncInProgress = true;
+
+  try {
+    const now = new Date();
+    const candidates = await Match.find({
+      sport: "football",
+      league: "afc_asian_cup",
+      status: "open",
+      espnEventId: { $exists: true, $ne: "" },
+      kickoff: { $gt: now }
+    });
+
+    if (candidates.length === 0) {
+      return;
+    }
+
+    const dates = getEplDateRangeToken(ESPN_AFC_ASIAN_CUP_SYNC_DAYS_AHEAD);
+    const events = await fetchAfcAsianCupScoreboardEvents(dates);
+    const incomingByEventId = new Map();
+
+    for (const event of events) {
+      const incoming = buildAfcAsianCupMatchFromEspnEvent(event);
+      if (incoming?.espnEventId) {
+        incomingByEventId.set(incoming.espnEventId, incoming);
+      }
+    }
+
+    let checked = 0;
+    let oddsUpdated = 0;
+
+    for (const match of candidates) {
+      const incoming = incomingByEventId.get(match.espnEventId);
+      if (!incoming || incoming.odds.length === 0) {
+        continue;
+      }
+
+      const kickoffTime = new Date(match.kickoff).getTime();
+      if (!Number.isFinite(kickoffTime) || kickoffTime <= Date.now()) {
+        continue;
+      }
+
+      const timeToKickoffMs = kickoffTime - Date.now();
+      const requiredIntervalMs = timeToKickoffMs <= ESPN_AFC_ASIAN_CUP_PREMATCH_NEAR_WINDOW_MS
+        ? ESPN_AFC_ASIAN_CUP_PREMATCH_SYNC_NEAR_INTERVAL_MS
+        : ESPN_AFC_ASIAN_CUP_PREMATCH_SYNC_FAR_INTERVAL_MS;
+
+      const lastSyncedAt = match.prematchOddsSyncedAt ? new Date(match.prematchOddsSyncedAt) : null;
+      const lastSyncedMs = lastSyncedAt && Number.isFinite(lastSyncedAt.getTime())
+        ? lastSyncedAt.getTime()
+        : null;
+
+      if (!forcePrematch && lastSyncedMs && (Date.now() - lastSyncedMs) < requiredIntervalMs) {
+        continue;
+      }
+
+      checked += 1;
+      const beforeOdds = JSON.stringify(match.odds || []);
+      const nextOdds = JSON.stringify(incoming.odds);
+
+      match.odds = incoming.odds;
+      match.prematchOddsSyncedAt = now;
+
+      if (beforeOdds !== nextOdds) {
+        oddsUpdated += 1;
+      }
+
+      await match.save();
+    }
+
+    if (checked > 0 || oddsUpdated > 0) {
+      console.log(`AFC Asian Cup prematch odds sync: checked ${checked}, updated ${oddsUpdated}.`);
+    }
+  } finally {
+    afcAsianCupPrematchSyncInProgress = false;
+  }
+}
+
+async function syncAfcAsianCupLiveOddsAndScores() {
+  if (!ESPN_AFC_ASIAN_CUP_AUTO_SYNC_ENABLED) {
+    return;
+  }
+
+  if (afcAsianCupLiveSyncInProgress) {
+    return;
+  }
+
+  afcAsianCupLiveSyncInProgress = true;
+
+  try {
+    const now = new Date();
+    const candidates = await Match.find({
+      sport: "football",
+      league: "afc_asian_cup",
+      status: "open",
+      espnEventId: { $exists: true, $ne: "" },
+      kickoff: { $lte: now }
+    });
+
+    if (candidates.length === 0) {
+      return;
+    }
+
+    const dates = getEplDateRangeTokenWithOffsets(-1, 1);
+    const events = await fetchAfcAsianCupScoreboardEvents(dates);
+    const incomingByEventId = new Map();
+
+    for (const event of events) {
+      const incoming = buildAfcAsianCupMatchFromEspnEvent(event);
+      if (incoming?.espnEventId) {
+        incomingByEventId.set(incoming.espnEventId, incoming);
+      }
+    }
+
+    let updated = 0;
+    let scoresUpdated = 0;
+    let autoClosed = 0;
+
+    for (const match of candidates) {
+      const incoming = incomingByEventId.get(match.espnEventId);
+      if (!incoming) {
+        continue;
+      }
+
+      let changed = false;
+
+      match.homeTeam = incoming.homeTeam;
+      match.awayTeam = incoming.awayTeam;
+      match.stadium = incoming.stadium || match.stadium;
+      match.kickoff = incoming.kickoff;
+
+      if (incoming.hasLiveScore) {
+        const scoreChanged = match.scoreHome !== incoming.scoreHome || match.scoreAway !== incoming.scoreAway;
+        match.scoreHome = incoming.scoreHome;
+        match.scoreAway = incoming.scoreAway;
+        if (scoreChanged) {
+          scoresUpdated += 1;
+        }
+        changed = true;
+      }
+
+      const isPostState = incoming.state === "post";
+      if (ESPN_AFC_ASIAN_CUP_AUTO_CLOSE_ENABLED && isPostState) {
+        const winnerKeys = deriveWinnerKeysByScore(incoming.scoreHome, incoming.scoreAway, match.odds);
+        if (winnerKeys.length > 0) {
+          await closeMatchAndSettleBets(match, {
+            winnerKeys,
+            scoreHome: incoming.scoreHome,
+            scoreAway: incoming.scoreAway
+          });
+          autoClosed += 1;
+          continue;
+        }
+      }
+
+      if (changed) {
+        await match.save();
+        updated += 1;
+      }
+    }
+
+    if (updated > 0 || scoresUpdated > 0 || autoClosed > 0) {
+      console.log(
+        `AFC Asian Cup live sync complete: updated ${updated}, scores updated ${scoresUpdated}, auto closed ${autoClosed}.`
+      );
+    }
+  } finally {
+    afcAsianCupLiveSyncInProgress = false;
+  }
+}
+
+function startAfcAsianCupCreateSyncScheduler() {
+  if (afcAsianCupCreateSyncIntervalId) {
+    clearInterval(afcAsianCupCreateSyncIntervalId);
+  }
+
+  if (!ESPN_AFC_ASIAN_CUP_AUTO_SYNC_ENABLED) {
+    console.log("AFC Asian Cup auto-sync is disabled (ESPN_AFC_ASIAN_CUP_AUTO_SYNC_ENABLED=false).");
+    return;
+  }
+
+  afcAsianCupCreateSyncIntervalId = setInterval(() => {
+    void syncAfcAsianCupCreateMatches().catch((error) => {
+      console.error("Failed to create AFC Asian Cup matches from ESPN:", error);
+    });
+  }, ESPN_AFC_ASIAN_CUP_CREATE_SYNC_INTERVAL_MS);
+}
+
+function startAfcAsianCupLiveSyncScheduler() {
+  if (afcAsianCupLiveSyncIntervalId) {
+    clearInterval(afcAsianCupLiveSyncIntervalId);
+  }
+
+  if (!ESPN_AFC_ASIAN_CUP_AUTO_SYNC_ENABLED) {
+    console.log("AFC Asian Cup auto-sync is disabled (ESPN_AFC_ASIAN_CUP_AUTO_SYNC_ENABLED=false).");
+    return;
+  }
+
+  afcAsianCupLiveSyncIntervalId = setInterval(() => {
+    void syncAfcAsianCupLiveOddsAndScores().catch((error) => {
+      console.error("Failed to sync AFC Asian Cup live odds/score from ESPN:", error);
+    });
+  }, ESPN_AFC_ASIAN_CUP_LIVE_SYNC_INTERVAL_MS);
+}
+
+function startAfcAsianCupPrematchSyncScheduler() {
+  if (afcAsianCupPrematchSyncIntervalId) {
+    clearInterval(afcAsianCupPrematchSyncIntervalId);
+  }
+
+  if (!ESPN_AFC_ASIAN_CUP_AUTO_SYNC_ENABLED) {
+    console.log("AFC Asian Cup auto-sync is disabled (ESPN_AFC_ASIAN_CUP_AUTO_SYNC_ENABLED=false).");
+    return;
+  }
+
+  afcAsianCupPrematchSyncIntervalId = setInterval(() => {
+    void syncAfcAsianCupPrematchOdds().catch((error) => {
+      console.error("Failed to sync AFC Asian Cup prematch odds from ESPN:", error);
+    });
+  }, ESPN_AFC_ASIAN_CUP_PREMATCH_SYNC_CHECK_INTERVAL_MS);
+}
+
+async function syncKsa1CreateMatches() {
+  if (!ESPN_KSA1_AUTO_SYNC_ENABLED) {
+    return;
+  }
+
+  if (ksa1CreateSyncInProgress) {
+    return;
+  }
+
+  ksa1CreateSyncInProgress = true;
+
+  try {
+    const dates = getEplDateRangeToken(ESPN_KSA1_SYNC_DAYS_AHEAD);
+    const events = await fetchKsa1ScoreboardEvents(dates);
+    let created = 0;
+    let updated = 0;
+
+    for (const event of events) {
+      const incoming = buildKsa1MatchFromEspnEvent(event);
+      if (!incoming?.espnEventId) {
+        continue;
+      }
+
+      const existing = await Match.findOne({ espnEventId: incoming.espnEventId, sport: "football", league: "ksa1" });
+      if (!existing) {
+        const matchCode = await generateMatchCode();
+        await Match.create({
+          espnEventId: incoming.espnEventId,
+          sport: "football",
+          league: "ksa1",
+          matchCode,
+          homeTeam: incoming.homeTeam,
+          awayTeam: incoming.awayTeam,
+          stadium: incoming.stadium,
+          kickoff: incoming.kickoff,
+          scoreHome: incoming.hasLiveScore ? incoming.scoreHome : 0,
+          scoreAway: incoming.hasLiveScore ? incoming.scoreAway : 0,
+          odds: incoming.odds,
+          status: "open"
+        });
+        created += 1;
+        continue;
+      }
+
+      if (existing.status !== "open") {
+        continue;
+      }
+
+      let changed = false;
+
+      if (existing.homeTeam !== incoming.homeTeam) {
+        existing.homeTeam = incoming.homeTeam;
+        changed = true;
+      }
+
+      if (existing.awayTeam !== incoming.awayTeam) {
+        existing.awayTeam = incoming.awayTeam;
+        changed = true;
+      }
+
+      const incomingStadium = incoming.stadium || "";
+      if ((existing.stadium || "") !== incomingStadium) {
+        existing.stadium = incomingStadium;
+        changed = true;
+      }
+
+      if (new Date(existing.kickoff).getTime() !== incoming.kickoff.getTime()) {
+        existing.kickoff = incoming.kickoff;
+        changed = true;
+      }
+
+      if (changed) {
+        await existing.save();
+        updated += 1;
+      }
+    }
+
+    if (created > 0 || updated > 0) {
+      console.log(`KSA create sync complete: created ${created} match(es), updated ${updated} match(es).`);
+    }
+  } finally {
+    ksa1CreateSyncInProgress = false;
+  }
+}
+
+async function syncKsa1PrematchOdds({ forcePrematch = false } = {}) {
+  if (!ESPN_KSA1_AUTO_SYNC_ENABLED) {
+    return;
+  }
+
+  if (ksa1PrematchSyncInProgress) {
+    return;
+  }
+
+  ksa1PrematchSyncInProgress = true;
+
+  try {
+    const now = new Date();
+    const candidates = await Match.find({
+      sport: "football",
+      league: "ksa1",
+      status: "open",
+      espnEventId: { $exists: true, $ne: "" },
+      kickoff: { $gt: now }
+    });
+
+    if (candidates.length === 0) {
+      return;
+    }
+
+    const dates = getEplDateRangeToken(ESPN_KSA1_SYNC_DAYS_AHEAD);
+    const events = await fetchKsa1ScoreboardEvents(dates);
+    const incomingByEventId = new Map();
+
+    for (const event of events) {
+      const incoming = buildKsa1MatchFromEspnEvent(event);
+      if (incoming?.espnEventId) {
+        incomingByEventId.set(incoming.espnEventId, incoming);
+      }
+    }
+
+    let checked = 0;
+    let oddsUpdated = 0;
+
+    for (const match of candidates) {
+      const incoming = incomingByEventId.get(match.espnEventId);
+      if (!incoming || incoming.odds.length === 0) {
+        continue;
+      }
+
+      const kickoffTime = new Date(match.kickoff).getTime();
+      if (!Number.isFinite(kickoffTime) || kickoffTime <= Date.now()) {
+        continue;
+      }
+
+      const timeToKickoffMs = kickoffTime - Date.now();
+      const requiredIntervalMs = timeToKickoffMs <= ESPN_KSA1_PREMATCH_NEAR_WINDOW_MS
+        ? ESPN_KSA1_PREMATCH_SYNC_NEAR_INTERVAL_MS
+        : ESPN_KSA1_PREMATCH_SYNC_FAR_INTERVAL_MS;
+
+      const lastSyncedAt = match.prematchOddsSyncedAt ? new Date(match.prematchOddsSyncedAt) : null;
+      const lastSyncedMs = lastSyncedAt && Number.isFinite(lastSyncedAt.getTime())
+        ? lastSyncedAt.getTime()
+        : null;
+
+      if (!forcePrematch && lastSyncedMs && (Date.now() - lastSyncedMs) < requiredIntervalMs) {
+        continue;
+      }
+
+      checked += 1;
+      const beforeOdds = JSON.stringify(match.odds || []);
+      const nextOdds = JSON.stringify(incoming.odds);
+
+      match.odds = incoming.odds;
+      match.prematchOddsSyncedAt = now;
+
+      if (beforeOdds !== nextOdds) {
+        oddsUpdated += 1;
+      }
+
+      await match.save();
+    }
+
+    if (checked > 0 || oddsUpdated > 0) {
+      console.log(`KSA prematch odds sync: checked ${checked}, updated ${oddsUpdated}.`);
+    }
+  } finally {
+    ksa1PrematchSyncInProgress = false;
+  }
+}
+
+async function syncKsa1LiveOddsAndScores() {
+  if (!ESPN_KSA1_AUTO_SYNC_ENABLED) {
+    return;
+  }
+
+  if (ksa1LiveSyncInProgress) {
+    return;
+  }
+
+  ksa1LiveSyncInProgress = true;
+
+  try {
+    const now = new Date();
+    const candidates = await Match.find({
+      sport: "football",
+      league: "ksa1",
+      status: "open",
+      espnEventId: { $exists: true, $ne: "" },
+      kickoff: { $lte: now }
+    });
+
+    if (candidates.length === 0) {
+      return;
+    }
+
+    const dates = getEplDateRangeTokenWithOffsets(-1, 1);
+    const events = await fetchKsa1ScoreboardEvents(dates);
+    const incomingByEventId = new Map();
+
+    for (const event of events) {
+      const incoming = buildKsa1MatchFromEspnEvent(event);
+      if (incoming?.espnEventId) {
+        incomingByEventId.set(incoming.espnEventId, incoming);
+      }
+    }
+
+    let updated = 0;
+    let scoresUpdated = 0;
+    let autoClosed = 0;
+
+    for (const match of candidates) {
+      const incoming = incomingByEventId.get(match.espnEventId);
+      if (!incoming) {
+        continue;
+      }
+
+      let changed = false;
+
+      match.homeTeam = incoming.homeTeam;
+      match.awayTeam = incoming.awayTeam;
+      match.stadium = incoming.stadium || match.stadium;
+      match.kickoff = incoming.kickoff;
+
+      if (incoming.hasLiveScore) {
+        const scoreChanged = match.scoreHome !== incoming.scoreHome || match.scoreAway !== incoming.scoreAway;
+        match.scoreHome = incoming.scoreHome;
+        match.scoreAway = incoming.scoreAway;
+        if (scoreChanged) {
+          scoresUpdated += 1;
+        }
+        changed = true;
+      }
+
+      const isPostState = incoming.state === "post";
+      if (ESPN_KSA1_AUTO_CLOSE_ENABLED && isPostState) {
+        const winnerKeys = deriveWinnerKeysByScore(incoming.scoreHome, incoming.scoreAway, match.odds);
+        if (winnerKeys.length > 0) {
+          await closeMatchAndSettleBets(match, {
+            winnerKeys,
+            scoreHome: incoming.scoreHome,
+            scoreAway: incoming.scoreAway
+          });
+          autoClosed += 1;
+          continue;
+        }
+      }
+
+      if (changed) {
+        await match.save();
+        updated += 1;
+      }
+    }
+
+    if (updated > 0 || scoresUpdated > 0 || autoClosed > 0) {
+      console.log(
+        `KSA live sync complete: updated ${updated}, scores updated ${scoresUpdated}, auto closed ${autoClosed}.`
+      );
+    }
+  } finally {
+    ksa1LiveSyncInProgress = false;
+  }
+}
+
+function startKsa1CreateSyncScheduler() {
+  if (ksa1CreateSyncIntervalId) {
+    clearInterval(ksa1CreateSyncIntervalId);
+  }
+
+  if (!ESPN_KSA1_AUTO_SYNC_ENABLED) {
+    console.log("KSA auto-sync is disabled (ESPN_KSA1_AUTO_SYNC_ENABLED=false).");
+    return;
+  }
+
+  ksa1CreateSyncIntervalId = setInterval(() => {
+    void syncKsa1CreateMatches().catch((error) => {
+      console.error("Failed to create KSA matches from ESPN:", error);
+    });
+  }, ESPN_KSA1_CREATE_SYNC_INTERVAL_MS);
+}
+
+function startKsa1LiveSyncScheduler() {
+  if (ksa1LiveSyncIntervalId) {
+    clearInterval(ksa1LiveSyncIntervalId);
+  }
+
+  if (!ESPN_KSA1_AUTO_SYNC_ENABLED) {
+    console.log("KSA auto-sync is disabled (ESPN_KSA1_AUTO_SYNC_ENABLED=false).");
+    return;
+  }
+
+  ksa1LiveSyncIntervalId = setInterval(() => {
+    void syncKsa1LiveOddsAndScores().catch((error) => {
+      console.error("Failed to sync KSA live odds/score from ESPN:", error);
+    });
+  }, ESPN_KSA1_LIVE_SYNC_INTERVAL_MS);
+}
+
+function startKsa1PrematchSyncScheduler() {
+  if (ksa1PrematchSyncIntervalId) {
+    clearInterval(ksa1PrematchSyncIntervalId);
+  }
+
+  if (!ESPN_KSA1_AUTO_SYNC_ENABLED) {
+    console.log("KSA auto-sync is disabled (ESPN_KSA1_AUTO_SYNC_ENABLED=false).");
+    return;
+  }
+
+  ksa1PrematchSyncIntervalId = setInterval(() => {
+    void syncKsa1PrematchOdds().catch((error) => {
+      console.error("Failed to sync KSA prematch odds from ESPN:", error);
+    });
+  }, ESPN_KSA1_PREMATCH_SYNC_CHECK_INTERVAL_MS);
+}
+
 async function syncNbaCreateMatches() {
   if (!ESPN_NBA_AUTO_SYNC_ENABLED) {
     return;
@@ -1078,12 +2460,13 @@ async function syncNbaCreateMatches() {
         continue;
       }
 
-      const existing = await Match.findOne({ espnEventId: incoming.espnEventId, sport: "basketball" });
+      const existing = await Match.findOne({ espnEventId: incoming.espnEventId, sport: "basketball", league: "nba" });
       if (!existing) {
         const matchCode = await generateMatchCode();
         await Match.create({
           espnEventId: incoming.espnEventId,
           sport: "basketball",
+          league: "nba",
           matchCode,
           homeTeam: incoming.homeTeam,
           awayTeam: incoming.awayTeam,
@@ -1154,6 +2537,7 @@ async function syncNbaPrematchOdds({ forcePrematch = false } = {}) {
     const now = new Date();
     const candidates = await Match.find({
       sport: "basketball",
+      league: "nba",
       status: "open",
       espnEventId: { $exists: true, $ne: "" },
       kickoff: { $gt: now }
@@ -1239,6 +2623,7 @@ async function syncNbaLiveOddsAndScores() {
     const now = new Date();
     const candidates = await Match.find({
       sport: "basketball",
+      league: "nba",
       status: "open",
       espnEventId: { $exists: true, $ne: "" },
       kickoff: { $lte: now }
@@ -1403,6 +2788,38 @@ async function backfillMatchSports() {
       }
     }
   );
+
+  await Match.updateMany(
+    {
+      sport: "football",
+      $or: [
+        { league: { $exists: false } },
+        { league: null },
+        { league: "" }
+      ]
+    },
+    {
+      $set: {
+        league: "epl"
+      }
+    }
+  );
+
+  await Match.updateMany(
+    {
+      sport: "basketball",
+      $or: [
+        { league: { $exists: false } },
+        { league: null },
+        { league: "" }
+      ]
+    },
+    {
+      $set: {
+        league: "nba"
+      }
+    }
+  );
 }
 
 async function cleanupOldBettingData() {
@@ -1450,6 +2867,22 @@ async function runManualSyncNow({ forcePrematch = false } = {}) {
     await syncEplCreateMatches();
     await syncEplPrematchOdds({ forcePrematch });
     await syncEplLiveOddsAndScores();
+
+    await syncLaLigaCreateMatches();
+    await syncLaLigaPrematchOdds({ forcePrematch });
+    await syncLaLigaLiveOddsAndScores();
+
+    await syncAfcCreateMatches();
+    await syncAfcPrematchOdds({ forcePrematch });
+    await syncAfcLiveOddsAndScores();
+
+    await syncAfcAsianCupCreateMatches();
+    await syncAfcAsianCupPrematchOdds({ forcePrematch });
+    await syncAfcAsianCupLiveOddsAndScores();
+
+    await syncKsa1CreateMatches();
+    await syncKsa1PrematchOdds({ forcePrematch });
+    await syncKsa1LiveOddsAndScores();
 
     await syncNbaCreateMatches();
     await syncNbaPrematchOdds({ forcePrematch });
@@ -1909,6 +3342,7 @@ async function resolveAviatorCrash() {
 app.get("/api/matches", async (req, res) => {
   const status = req.query.status;
   const sport = typeof req.query.sport === "string" ? req.query.sport.trim().toLowerCase() : "";
+  const league = typeof req.query.league === "string" ? req.query.league.trim().toLowerCase() : "";
   const query = {};
 
   if (status) {
@@ -1920,6 +3354,13 @@ app.get("/api/matches", async (req, res) => {
       return res.status(400).json({ error: "Invalid sport" });
     }
     query.sport = sport;
+  }
+
+  if (league) {
+    if (!["epl", "laliga", "afc", "afc_asian_cup", "ksa1", "nba"].includes(league)) {
+      return res.status(400).json({ error: "Invalid league" });
+    }
+    query.league = league;
   }
 
   const matches = await Match.find(query).sort({ kickoff: 1 });
@@ -2237,7 +3678,7 @@ app.post("/api/admin/broadcast", async (req, res) => {
 });
 
 app.post("/api/matches", async (req, res) => {
-  const { homeTeam, awayTeam, stadium, kickoff, odds, sport } = req.body;
+  const { homeTeam, awayTeam, stadium, kickoff, odds, sport, league } = req.body;
   if (!homeTeam || !awayTeam || !kickoff || !Array.isArray(odds) || odds.length === 0) {
     return res.status(400).json({ error: "Invalid payload" });
   }
@@ -2245,6 +3686,13 @@ app.post("/api/matches", async (req, res) => {
   const normalizedSport = typeof sport === "string" ? sport.trim().toLowerCase() : "football";
   if (!["football", "basketball"].includes(normalizedSport)) {
     return res.status(400).json({ error: "Invalid sport" });
+  }
+
+  const normalizedLeague = typeof league === "string" ? league.trim().toLowerCase() : "";
+  const fallbackLeague = normalizedSport === "basketball" ? "nba" : "epl";
+  const nextLeague = normalizedLeague || fallbackLeague;
+  if (!["epl", "laliga", "afc", "afc_asian_cup", "ksa1", "nba"].includes(nextLeague)) {
+    return res.status(400).json({ error: "Invalid league" });
   }
 
   const kickoffDate = parseKickoffInput(kickoff);
@@ -2256,6 +3704,7 @@ app.post("/api/matches", async (req, res) => {
 
   const match = await Match.create({
     sport: normalizedSport,
+    league: nextLeague,
     matchCode,
     homeTeam,
     awayTeam,
@@ -2295,7 +3744,14 @@ app.put("/api/matches/:id", async (req, res) => {
     }
   }
 
-  const allowed = ["homeTeam", "awayTeam", "stadium", "kickoff", "odds", "sport"];
+  if (updates.league !== undefined) {
+    const nextLeague = typeof updates.league === "string" ? updates.league.trim().toLowerCase() : "";
+    if (!["epl", "laliga", "afc", "afc_asian_cup", "ksa1", "nba"].includes(nextLeague)) {
+      return res.status(400).json({ error: "Invalid league" });
+    }
+  }
+
+  const allowed = ["homeTeam", "awayTeam", "stadium", "kickoff", "odds", "sport", "league"];
   allowed.forEach((key) => {
     if (updates[key] !== undefined) {
       if (key === "kickoff") {
@@ -2306,6 +3762,12 @@ app.put("/api/matches/:id", async (req, res) => {
       if (key === "sport") {
         const nextSport = updates[key].trim().toLowerCase();
         match[key] = nextSport;
+        return;
+      }
+
+      if (key === "league") {
+        const nextLeague = updates[key].trim().toLowerCase();
+        match[key] = nextLeague;
         return;
       }
 
@@ -2532,6 +3994,42 @@ async function start() {
   await syncEplLiveOddsAndScores().catch((error) => {
     console.error("Initial EPL live sync failed:", error);
   });
+  await syncLaLigaCreateMatches().catch((error) => {
+    console.error("Initial LaLiga create sync failed:", error);
+  });
+  await syncLaLigaPrematchOdds().catch((error) => {
+    console.error("Initial LaLiga prematch sync failed:", error);
+  });
+  await syncLaLigaLiveOddsAndScores().catch((error) => {
+    console.error("Initial LaLiga live sync failed:", error);
+  });
+  await syncAfcCreateMatches().catch((error) => {
+    console.error("Initial AFC create sync failed:", error);
+  });
+  await syncAfcPrematchOdds().catch((error) => {
+    console.error("Initial AFC prematch sync failed:", error);
+  });
+  await syncAfcLiveOddsAndScores().catch((error) => {
+    console.error("Initial AFC live sync failed:", error);
+  });
+  await syncAfcAsianCupCreateMatches().catch((error) => {
+    console.error("Initial AFC Asian Cup create sync failed:", error);
+  });
+  await syncAfcAsianCupPrematchOdds().catch((error) => {
+    console.error("Initial AFC Asian Cup prematch sync failed:", error);
+  });
+  await syncAfcAsianCupLiveOddsAndScores().catch((error) => {
+    console.error("Initial AFC Asian Cup live sync failed:", error);
+  });
+  await syncKsa1CreateMatches().catch((error) => {
+    console.error("Initial KSA create sync failed:", error);
+  });
+  await syncKsa1PrematchOdds().catch((error) => {
+    console.error("Initial KSA prematch sync failed:", error);
+  });
+  await syncKsa1LiveOddsAndScores().catch((error) => {
+    console.error("Initial KSA live sync failed:", error);
+  });
   await syncNbaCreateMatches().catch((error) => {
     console.error("Initial NBA create sync failed:", error);
   });
@@ -2546,6 +4044,18 @@ async function start() {
   startEplCreateSyncScheduler();
   startEplPrematchSyncScheduler();
   startEplLiveSyncScheduler();
+  startLaLigaCreateSyncScheduler();
+  startLaLigaPrematchSyncScheduler();
+  startLaLigaLiveSyncScheduler();
+  startAfcCreateSyncScheduler();
+  startAfcPrematchSyncScheduler();
+  startAfcLiveSyncScheduler();
+  startAfcAsianCupCreateSyncScheduler();
+  startAfcAsianCupPrematchSyncScheduler();
+  startAfcAsianCupLiveSyncScheduler();
+  startKsa1CreateSyncScheduler();
+  startKsa1PrematchSyncScheduler();
+  startKsa1LiveSyncScheduler();
   startNbaCreateSyncScheduler();
   startNbaPrematchSyncScheduler();
   startNbaLiveSyncScheduler();

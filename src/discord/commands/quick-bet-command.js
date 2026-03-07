@@ -175,6 +175,8 @@ function createQuickBetCommand({
   commandName,
   commandDescription,
   sport,
+  league,
+  leagues,
   noMatchMessage,
   panelTitle,
   sessionExpiredMessage,
@@ -201,6 +203,12 @@ function createQuickBetCommand({
         isLive: { $ne: true },
         kickoff: { $gt: now }
       };
+
+      if (Array.isArray(leagues) && leagues.length > 0) {
+        openQuery.league = { $in: leagues };
+      } else if (league) {
+        openQuery.league = league;
+      }
 
       const matches = await Match.find(openQuery).sort({ kickoff: 1 }).limit(25);
       if (matches.length === 0) {
@@ -371,6 +379,12 @@ function createQuickBetCommand({
             isLive: { $ne: true },
             kickoff: { $gt: new Date() }
           };
+
+          if (Array.isArray(leagues) && leagues.length > 0) {
+            liveOpenQuery.league = { $in: leagues };
+          } else if (league) {
+            liveOpenQuery.league = league;
+          }
 
           const match = await Match.findOne(liveOpenQuery);
           if (!match) {

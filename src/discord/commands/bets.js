@@ -45,6 +45,8 @@ module.exports = {
         ? "🏀 NBA"
         : league === "laliga"
           ? "⚽ LaLiga"
+          : league === "uefa"
+            ? "⚽ UEFA Champions League"
           : league === "afc"
             ? "⚽ AFC Champions"
             : league === "afc_asian_cup"

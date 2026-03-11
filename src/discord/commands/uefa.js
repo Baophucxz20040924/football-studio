@@ -42,12 +42,12 @@ function chunkDescriptions(items, separator = "\n\n", maxLength = EMBED_DESCRIPT
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName("afc")
-    .setDescription("List open AFC Champions matches"),
+    .setName("uefa")
+    .setDescription("List open UEFA Champions League matches"),
   async execute(interaction) {
     const matches = await Match.find({
       sport: "football",
-      league: "afc",
+      league: "uefa",
       status: "open",
       betLocked: { $ne: true },
       kickoff: { $gt: new Date() }
@@ -56,8 +56,8 @@ module.exports = {
 
     if (matches.length === 0) {
       const embed = buildEmbed({
-        title: "No open AFC Champions matches ⚽",
-        description: "No AFC Champions games are open for betting right now.",
+        title: "No open UEFA Champions League matches ⚽",
+        description: "No UEFA Champions League games are open for betting right now.",
         color: 0x6ae4c5
       });
       return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
@@ -80,14 +80,13 @@ module.exports = {
           `Odds 1x2: ${oneXTwoText}`,
           `Odds O/U: ${totalsText}`
         ].join("\n");
-      })
-      ;
+      });
 
     const descriptions = chunkDescriptions(blocks);
     const embeds = descriptions.map((description, index) => buildEmbed({
       title: descriptions.length > 1
-        ? `Open AFC Champions matches ⚽ (${index + 1}/${descriptions.length})`
-        : "Open AFC Champions matches ⚽",
+        ? `Open UEFA Champions League matches ⚽ (${index + 1}/${descriptions.length})`
+        : "Open UEFA Champions League matches ⚽",
       description,
       color: 0xf6c244
     }));

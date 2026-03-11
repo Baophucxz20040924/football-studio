@@ -17,20 +17,20 @@ function formatGoals(goals) {
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName("live-afc")
-    .setDescription("List live AFC Champions matches"),
+    .setName("live-uefa")
+    .setDescription("List live UEFA Champions League matches"),
   async execute(interaction) {
     const matches = await Match.find({
       sport: "football",
-      league: "afc",
+      league: "uefa",
       status: "open",
       isLive: true
     }).sort({ kickoff: 1 });
 
     if (matches.length === 0) {
       const embed = buildEmbed({
-        title: "No live AFC Champions matches ⏳",
-        description: "No AFC Champions games are live right now. 📴",
+        title: "No live UEFA Champions League matches ⏳",
+        description: "No UEFA Champions League games are live right now. 📴",
         color: 0xf36c5c
       });
       return interaction.reply({ embeds: [embed] });
@@ -52,7 +52,7 @@ module.exports = {
       .join("\n\n");
 
     const embed = buildEmbed({
-      title: "Live AFC Champions matches 🔴",
+      title: "Live UEFA Champions League matches 🔴",
       description,
       color: 0xf36c5c
     });

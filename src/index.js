@@ -7,8 +7,10 @@ const {
   REST,
   Routes,
   ChannelType,
-  PermissionsBitField
+  PermissionsBitField,
+  EmbedBuilder
 } = require("discord.js");
+const { setSettlementBroadcaster, formatPrice: formatSettlePrice } = require("./trade/service");
 require("dotenv").config();
 
 const Match = require("./models/Match");
@@ -4001,6 +4003,55 @@ client.once("clientReady", () => {
   const guilds = client.guilds.cache.map((guild) => guild.id);
   guilds.forEach((guildId) => {
     registerGuildCommands(guildId);
+  });
+
+  setSettlementBroadcaster(async (data) => {
+    const { session, closePrice, result, settled } = data;
+    const startSec = Math.floor(new Date(session.startTime).getTime() / 1000);
+    const endSec = Math.floor(new Date(session.endTime).getTime() / 1000);
+
+    const resultLabel = result === "up" ? "LÊN 📈" : result === "down" ? "XUỐNG 📉" : "HÒA ⚖️";
+    const resultColor = result === "up" ? 0x22c55e : result === "down" ? 0xef4444 : 0xfbbf24;
+
+    const lines = [
+      `Phiên <t:${startSec}:t> → <t:${endSec}:t>`,
+      `Giá: **${formatSettlePrice(session.openPrice)}** → **${formatSettlePrice(closePrice)}**`
+    ];
+
+    if (settled.length === 0) {
+      lines.push("", "_Không có ai đặt cược trong phiên này._");
+    } else {
+      const winners = settled.filter((b) => b.status === "won");
+      const losers = settled.filter((b) => b.status === "lost");
+      const pushers = settled.filter((b) => b.status === "push");
+
+      if (winners.length > 0) {
+        lines.push("", "🏆 **Thắng:** " + winners.map((b) => `${b.userName} +${formatSettlePrice(b.payout)}`).join(" | "));
+      }
+      if (losers.length > 0) {
+        lines.push("❌ **Thua:** " + losers.map((b) => `${b.userName} -${formatSettlePrice(b.amount)}`).join(" | "));
+      }
+      if (pushers.length > 0) {
+        lines.push("↩️ **Hoàn tiền:** " + pushers.map((b) => `${b.userName} ${formatSettlePrice(b.amount)}`).join(" | "));
+      }
+    }
+
+    const embed = new EmbedBuilder()
+      .setTitle(`Trade ${session.symbol || "BTCUSDT"} | ${resultLabel}`)
+      .setDescription(lines.join("\n"))
+      .setColor(resultColor);
+
+    const allGuilds = Array.from(client.guilds.cache.values());
+    for (const guild of allGuilds) {
+      try {
+        const channel = await resolveGuildBroadcastChannel(guild);
+        if (channel) {
+          await channel.send({ embeds: [embed] });
+        }
+      } catch (err) {
+        console.error(`Trade broadcast failed for guild ${guild.id}:`, err?.message);
+      }
+    }
   });
 });
 

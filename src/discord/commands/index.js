@@ -32,6 +32,7 @@ const commands = [
   require("./daily"),
   require("./lixi"),
   require("./work"),
+  require("./trade"),
   require("./ranking"),
   require("./epl-rank"),
   require("./donate"),

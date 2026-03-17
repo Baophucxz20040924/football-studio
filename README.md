@@ -11,6 +11,9 @@ This system includes a Discord bot, an admin web panel, and game modules (Aviato
   - Match management interface.
 - **Chat Web**: `src/chat/public`
 - **Aviator Web**: `src/aviator/public`
+- **Trade engine**:
+  - Slash command: `/trade`
+  - Uses 5-minute rolling sessions with real coin prices
 - **Tiến Lên module**:
   - Server: `src/tienlen/server`
   - Client (Vite build): `src/tienlen/server/client`
@@ -93,7 +96,26 @@ ESPN_NBA_PREMATCH_SYNC_FAR_INTERVAL_MS=7200000
 ESPN_NBA_PREMATCH_SYNC_NEAR_INTERVAL_MS=3600000
 ESPN_NBA_PREMATCH_NEAR_WINDOW_MS=7200000
 ESPN_NBA_SYNC_DAYS_AHEAD=7
+
+TRADE_SYMBOL=BTCUSDT
+TRADE_PRICE_SYMBOL=BTCUSDT
+TRADE_SESSION_INTERVAL_MS=120000
+TRADE_IDLE_SESSION_LIMIT=3
+TRADE_PAYOUT_MULTIPLIER=2
+TRADE_PRICE_API_BASE_URL=https://api.binance.com
 ```
+
+Trade notes:
+
+- `/trade` starts the trade engine on demand if it is sleeping.
+- `/trade` uses Binance as both price source and chart link, so display and settlement are aligned.
+- Users always bet on the next session, never the session already running.
+- Example:
+  - With `TRADE_SESSION_INTERVAL_MS=120000` (2 minutes), between `10:00` and `10:02`, users place bets for the `10:02 -> 10:04` session.
+  - At `10:02`, the engine snapshots the opening price for that session.
+  - At `10:04`, it snapshots the closing price and settles bets.
+- If 3 consecutive settled sessions have no bets, the engine stops itself.
+- If open price equals close price, bets are refunded.
 
 ## 5) Deploy Slash Commands
 
@@ -167,6 +189,10 @@ npm run stop-all
 
 - **Slash commands are not updated**
   - Re-run `npm run deploy-commands` and restart the bot.
+
+- **Trade session does not settle**
+  - Check outbound access to `https://api.binance.com`.
+  - Verify `TRADE_SYMBOL` or `TRADE_PRICE_SYMBOL` is a valid Binance symbol such as `BTCUSDT`.
 
 - **Cannot connect to MongoDB**
   - Check `MONGODB_URI` in `.env`.

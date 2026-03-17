@@ -1,0 +1,399 @@
+const {
+  SlashCommandBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  MessageFlags
+} = require("discord.js");
+const { buildEmbed, getOrCreateUser, normalizeAmount, formatPoints } = require("./utils");
+const {
+  DEFAULT_SYMBOL,
+  TRADE_SESSION_INTERVAL_MINUTES,
+  PAYOUT_MULTIPLIER,
+  formatPrice,
+  getTradeOverview,
+  getUserTradeBet,
+  placeTradeBet,
+  ensureTradeEngineStarted
+} = require("../../trade/service");
+
+const SESSION_TIMEOUT_MS = 60000;
+const QUICK_AMOUNT_OPTIONS = [100, 500, 1000, 5000, 10000];
+
+function formatDirection(direction) {
+  return direction === "up" ? "Lên" : "Xuống";
+}
+
+function buildSessionLabel(session) {
+  if (!session) {
+    return "Chưa sẵn sàng";
+  }
+
+  return `${formatDiscordTime(session.startTime)} -> ${formatDiscordTime(session.endTime)}`;
+}
+
+function formatDiscordTime(value, style = "t") {
+  const date = new Date(value);
+  const seconds = Math.floor(date.getTime() / 1000);
+  if (!Number.isFinite(seconds) || seconds <= 0) {
+    return "(không rõ)";
+  }
+
+  return `<t:${seconds}:${style}>`;
+}
+
+function buildTradeDescription({ overview, balance, existingBet, selectedDirection, selectedAmount, note }) {
+  const lines = [
+    `Coin: **${overview.symbol || DEFAULT_SYMBOL}**`,
+    `Link chart: ${overview.chartUrl}`
+  ];
+
+  if (overview.activeSession) {
+    lines.push(
+      "",
+      `Phiên đang chạy: **${buildSessionLabel(overview.activeSession)}**`,
+      `Giá mở: **${formatPrice(overview.activeSession.openPrice)}**`
+    );
+  }
+
+  if (overview.nextSession) {
+    lines.push(
+      "",
+      `Phiên đang nhận cược: **${buildSessionLabel(overview.nextSession)}**`,
+      `Mở phiên lúc: **${formatDiscordTime(overview.nextSession.startTime, "f")}** (${formatDiscordTime(overview.nextSession.startTime, "R")})`,
+      `Đóng phiên lúc: **${formatDiscordTime(overview.nextSession.endTime, "f")}** (${formatDiscordTime(overview.nextSession.endTime, "R")})`
+    );
+  }
+
+  if (overview.lastSettledSession) {
+    lines.push(
+      "",
+      `Phiên vừa chốt: **${buildSessionLabel(overview.lastSettledSession)}**`,
+      `Kết quả: **${overview.lastSettledSession.result === "up" ? "Lên" : overview.lastSettledSession.result === "down" ? "Xuống" : "Hòa"}**`,
+      `Gia: **${formatPrice(overview.lastSettledSession.openPrice)}** -> **${formatPrice(overview.lastSettledSession.closePrice)}**`
+    );
+  }
+
+  const currentBet = existingBet;
+  if (currentBet) {
+    lines.push(
+      "",
+      `Cược của bạn cho phiên kế tiếp: **${formatDirection(currentBet.direction)}** ${formatPoints(currentBet.amount)}`
+    );
+  } else {
+    lines.push(
+      "",
+      `Hướng đã chọn: **${selectedDirection ? formatDirection(selectedDirection) : "(chưa chọn)"}**`,
+      `Số tiền đã chọn: **${selectedAmount ? formatPoints(selectedAmount) : "(chưa chọn)"}**`
+    );
+  }
+
+  if (note) {
+    lines.push("", note);
+  }
+
+  lines.push(
+    "",
+    `Số dư hiện tại: **${formatPoints(balance)}**`,
+    `Thắng nhận: **x${PAYOUT_MULTIPLIER}** | Hòa: **hoàn tiền**`
+  );
+
+  return lines.join("\n");
+}
+
+function buildDirectionRow(selectedDirection, disabled = false) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId("trade:dir:up")
+      .setLabel("Lên")
+      .setStyle(selectedDirection === "up" ? ButtonStyle.Primary : ButtonStyle.Secondary)
+      .setDisabled(disabled),
+    new ButtonBuilder()
+      .setCustomId("trade:dir:down")
+      .setLabel("Xuống")
+      .setStyle(selectedDirection === "down" ? ButtonStyle.Primary : ButtonStyle.Secondary)
+      .setDisabled(disabled)
+  );
+}
+
+function buildAmountRow(selectedAmount, disabled = false) {
+  return new ActionRowBuilder().addComponents(
+    ...QUICK_AMOUNT_OPTIONS.map((amount) => (
+      new ButtonBuilder()
+        .setCustomId(`trade:amt:${amount}`)
+        .setLabel(amount >= 1000 ? `${Math.round(amount / 1000)}K` : String(amount))
+        .setStyle(selectedAmount === amount ? ButtonStyle.Primary : ButtonStyle.Secondary)
+        .setDisabled(disabled)
+    ))
+  );
+}
+
+function buildActionRows({ selectedDirection, selectedAmount, disableAll = false }) {
+  return [
+    buildDirectionRow(selectedDirection, disableAll),
+    buildAmountRow(selectedAmount, disableAll || !selectedDirection),
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId("trade:amt_custom")
+        .setLabel("Nhập tay")
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(disableAll || !selectedDirection),
+      new ButtonBuilder()
+        .setCustomId("trade:confirm")
+        .setLabel("Xác nhận")
+        .setStyle(ButtonStyle.Success)
+        .setDisabled(disableAll || !selectedDirection || !selectedAmount),
+      new ButtonBuilder()
+        .setCustomId("trade:cancel")
+        .setLabel("Hủy")
+        .setStyle(ButtonStyle.Danger)
+        .setDisabled(disableAll)
+    )
+  ];
+}
+
+async function buildTradePanel({ userId, balance, existingBet, selectedDirection, selectedAmount, note, closed }) {
+  const overview = await getTradeOverview();
+  const sessionMinutes = Number.isFinite(TRADE_SESSION_INTERVAL_MINUTES)
+    ? TRADE_SESSION_INTERVAL_MINUTES
+    : 2;
+  const embed = buildEmbed({
+    title: existingBet
+      ? `Trade ${sessionMinutes} phút (đã đặt cược)`
+      : `Trade ${sessionMinutes} phút`,
+    description: buildTradeDescription({
+      overview,
+      balance,
+      existingBet,
+      selectedDirection,
+      selectedAmount,
+      note
+    }),
+    color: existingBet ? 0x22c55e : 0x6ae4c5
+  });
+
+  if (closed || existingBet) {
+    return { embeds: [embed], components: [] };
+  }
+
+  return {
+    embeds: [embed],
+    components: buildActionRows({ selectedDirection, selectedAmount })
+  };
+}
+
+module.exports = {
+  data: new SlashCommandBuilder()
+    .setName("trade")
+    .setDescription("Mở bảng trade và đặt cược cho phiên kế tiếp"),
+  async execute(interaction) {
+    const userName = interaction.user.globalName || interaction.user.username;
+    const user = await getOrCreateUser(interaction.user.id, userName);
+    await ensureTradeEngineStarted();
+
+    const overview = await getTradeOverview();
+    const initialBet = overview.nextSession
+      ? await getUserTradeBet(interaction.user.id, overview.nextSession._id)
+      : null;
+
+    let selectedDirection = null;
+    let selectedAmount = null;
+    let finalized = false;
+
+    await interaction.reply(await buildTradePanel({
+      userId: interaction.user.id,
+      balance: user.balance,
+      existingBet: initialBet,
+      selectedDirection,
+      selectedAmount
+    }));
+
+    if (initialBet) {
+      return null;
+    }
+
+    const replyMessage = await interaction.fetchReply();
+    const collector = replyMessage.createMessageComponentCollector({ time: SESSION_TIMEOUT_MS });
+
+    collector.on("collect", async (componentInteraction) => {
+      if (componentInteraction.user.id !== interaction.user.id) {
+        await componentInteraction.reply({ content: "Bảng trade này không phải của bạn.", flags: MessageFlags.Ephemeral });
+        return;
+      }
+
+      if (!componentInteraction.isButton()) {
+        return;
+      }
+
+      const [, action, value] = componentInteraction.customId.split(":");
+      if (action === "cancel") {
+        finalized = true;
+        collector.stop("cancelled");
+        await componentInteraction.update(await buildTradePanel({
+          userId: interaction.user.id,
+          balance: user.balance,
+          existingBet: null,
+          selectedDirection,
+          selectedAmount,
+          note: "Đã hủy thao tác trade.",
+          closed: true
+        }));
+        return;
+      }
+
+      if (action === "dir") {
+        selectedDirection = value === "up" ? "up" : value === "down" ? "down" : null;
+        if (!selectedDirection) {
+          await componentInteraction.reply({ content: "Hướng trade không hợp lệ.", flags: MessageFlags.Ephemeral });
+          return;
+        }
+
+        selectedAmount = null;
+        await componentInteraction.update(await buildTradePanel({
+          userId: interaction.user.id,
+          balance: user.balance,
+          existingBet: null,
+          selectedDirection,
+          selectedAmount
+        }));
+        return;
+      }
+
+      if (action === "amt") {
+        if (!selectedDirection) {
+          await componentInteraction.reply({ content: "Chọn hướng trước khi chọn số tiền.", flags: MessageFlags.Ephemeral });
+          return;
+        }
+
+        const parsed = Number(value);
+        if (!Number.isFinite(parsed) || parsed <= 0) {
+          await componentInteraction.reply({ content: "Số tiền không hợp lệ.", flags: MessageFlags.Ephemeral });
+          return;
+        }
+
+        selectedAmount = Math.floor(parsed);
+        await componentInteraction.update(await buildTradePanel({
+          userId: interaction.user.id,
+          balance: user.balance,
+          existingBet: null,
+          selectedDirection,
+          selectedAmount
+        }));
+        return;
+      }
+
+      if (action === "amt_custom") {
+        if (!selectedDirection) {
+          await componentInteraction.reply({ content: "Chọn hướng trước khi nhập tiền.", flags: MessageFlags.Ephemeral });
+          return;
+        }
+
+        const modalId = `trade_custom:${interaction.id}:${componentInteraction.id}`;
+        const modal = new ModalBuilder()
+          .setCustomId(modalId)
+          .setTitle("Nhập số tiền trade");
+
+        const amountInput = new TextInputBuilder()
+          .setCustomId("amount")
+          .setLabel("Số điểm (hỗ trợ 1k, 2.5k)")
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+          .setPlaceholder("Ví dụ: 1000 hoặc 1k");
+
+        modal.addComponents(new ActionRowBuilder().addComponents(amountInput));
+        await componentInteraction.showModal(modal);
+
+        let submitted;
+        try {
+          submitted = await componentInteraction.awaitModalSubmit({
+            time: SESSION_TIMEOUT_MS,
+            filter: (i) => i.customId === modalId && i.user.id === componentInteraction.user.id
+          });
+        } catch {
+          return;
+        }
+
+        const parsedAmount = normalizeAmount(submitted.fields.getTextInputValue("amount").trim());
+        if (!parsedAmount || parsedAmount <= 0) {
+          await submitted.reply({ content: "Số tiền không hợp lệ.", flags: MessageFlags.Ephemeral });
+          return;
+        }
+
+        selectedAmount = parsedAmount;
+        await submitted.reply({
+          content: `Đã chọn ${formatPoints(selectedAmount)} điểm. Bấm Xác nhận để đặt cược.`,
+          flags: MessageFlags.Ephemeral
+        });
+
+        await interaction.editReply(await buildTradePanel({
+          userId: interaction.user.id,
+          balance: user.balance,
+          existingBet: null,
+          selectedDirection,
+          selectedAmount
+        }));
+        return;
+      }
+
+      if (action === "confirm") {
+        if (!selectedDirection || !selectedAmount) {
+          await componentInteraction.reply({ content: "Chọn đủ hướng và số tiền trước khi xác nhận.", flags: MessageFlags.Ephemeral });
+          return;
+        }
+
+        try {
+          const placed = await placeTradeBet({
+            userId: interaction.user.id,
+            userName,
+            direction: selectedDirection,
+            amount: selectedAmount
+          });
+          user.balance = placed.balance;
+
+          finalized = true;
+          collector.stop("placed");
+
+          await componentInteraction.update(await buildTradePanel({
+            userId: interaction.user.id,
+            balance: placed.balance,
+            existingBet: placed.bet,
+            selectedDirection,
+            selectedAmount,
+            note: "Đặt cược thành công. Hệ thống sẽ tự động chốt kết quả khi hết phiên.",
+            closed: true
+          }));
+        } catch (error) {
+          await componentInteraction.reply({
+            content: String(error?.message || "Không thể đặt trade lúc này."),
+            flags: MessageFlags.Ephemeral
+          });
+        }
+      }
+    });
+
+    collector.on("end", async () => {
+      if (finalized) {
+        return;
+      }
+
+      try {
+        await interaction.editReply(await buildTradePanel({
+          userId: interaction.user.id,
+          balance: user.balance,
+          existingBet: null,
+          selectedDirection,
+          selectedAmount,
+          note: "Phiên thao tác đã hết hạn. Gõ /trade để mở lại.",
+          closed: true
+        }));
+      } catch {
+        // Ignore edit failures when panel expired.
+      }
+    });
+
+    return null;
+  }
+};

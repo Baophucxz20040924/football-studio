@@ -26,6 +26,21 @@ const MONGODB_URI = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/footba
 const STARTING_BALANCE = Number(process.env.STARTING_BALANCE || 0);
 const MATCH_AUTO_LOCK_INTERVAL_MS = Number(process.env.MATCH_AUTO_LOCK_INTERVAL_MS || 30_000);
 const KICKOFF_UTC_OFFSET_MINUTES = Number(process.env.KICKOFF_UTC_OFFSET_MINUTES || 420);
+
+function getBooleanEnv(primaryKey, legacyKey, defaultValue = true) {
+  const rawValue = process.env[primaryKey] ?? process.env[legacyKey];
+  if (rawValue === undefined) {
+    return defaultValue;
+  }
+
+  return rawValue !== "false";
+}
+
+function getNumberEnv(primaryKey, legacyKey, defaultValue) {
+  const rawValue = process.env[primaryKey] ?? process.env[legacyKey];
+  return Number(rawValue ?? defaultValue);
+}
+
 const ESPN_EPL_AUTO_SYNC_ENABLED = process.env.ESPN_EPL_AUTO_SYNC_ENABLED !== "false";
 const ESPN_EPL_AUTO_CLOSE_ENABLED = process.env.ESPN_EPL_AUTO_CLOSE_ENABLED !== "false";
 const ESPN_EPL_CREATE_SYNC_INTERVAL_MS = Number(process.env.ESPN_EPL_CREATE_SYNC_INTERVAL_MS || 30 * 60_000);
@@ -46,16 +61,26 @@ const ESPN_LALIGA_PREMATCH_SYNC_NEAR_INTERVAL_MS = Number(process.env.ESPN_LALIG
 const ESPN_LALIGA_PREMATCH_NEAR_WINDOW_MS = Number(process.env.ESPN_LALIGA_PREMATCH_NEAR_WINDOW_MS || 2 * 60 * 60_000);
 const ESPN_LALIGA_SYNC_DAYS_AHEAD = Number(process.env.ESPN_LALIGA_SYNC_DAYS_AHEAD || 7);
 const ESPN_LALIGA_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/soccer/esp.1/scoreboard";
-const ESPN_AFC_AUTO_SYNC_ENABLED = process.env.ESPN_AFC_AUTO_SYNC_ENABLED !== "false";
-const ESPN_AFC_AUTO_CLOSE_ENABLED = process.env.ESPN_AFC_AUTO_CLOSE_ENABLED !== "false";
-const ESPN_AFC_CREATE_SYNC_INTERVAL_MS = Number(process.env.ESPN_AFC_CREATE_SYNC_INTERVAL_MS || 30 * 60_000);
-const ESPN_AFC_LIVE_SYNC_INTERVAL_MS = Number(process.env.ESPN_AFC_LIVE_SYNC_INTERVAL_MS || 2 * 60_000);
-const ESPN_AFC_PREMATCH_SYNC_CHECK_INTERVAL_MS = Number(process.env.ESPN_AFC_PREMATCH_SYNC_CHECK_INTERVAL_MS || 10 * 60_000);
-const ESPN_AFC_PREMATCH_SYNC_FAR_INTERVAL_MS = Number(process.env.ESPN_AFC_PREMATCH_SYNC_FAR_INTERVAL_MS || 2 * 60 * 60_000);
-const ESPN_AFC_PREMATCH_SYNC_NEAR_INTERVAL_MS = Number(process.env.ESPN_AFC_PREMATCH_SYNC_NEAR_INTERVAL_MS || 60 * 60_000);
-const ESPN_AFC_PREMATCH_NEAR_WINDOW_MS = Number(process.env.ESPN_AFC_PREMATCH_NEAR_WINDOW_MS || 2 * 60 * 60_000);
-const ESPN_AFC_SYNC_DAYS_AHEAD = Number(process.env.ESPN_AFC_SYNC_DAYS_AHEAD || 7);
-const ESPN_AFC_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.champions/scoreboard";
+const ESPN_UEFA_AUTO_SYNC_ENABLED = getBooleanEnv("ESPN_UEFA_AUTO_SYNC_ENABLED", "ESPN_AFC_AUTO_SYNC_ENABLED");
+const ESPN_UEFA_AUTO_CLOSE_ENABLED = getBooleanEnv("ESPN_UEFA_AUTO_CLOSE_ENABLED", "ESPN_AFC_AUTO_CLOSE_ENABLED");
+const ESPN_UEFA_CREATE_SYNC_INTERVAL_MS = getNumberEnv("ESPN_UEFA_CREATE_SYNC_INTERVAL_MS", "ESPN_AFC_CREATE_SYNC_INTERVAL_MS", 30 * 60_000);
+const ESPN_UEFA_LIVE_SYNC_INTERVAL_MS = getNumberEnv("ESPN_UEFA_LIVE_SYNC_INTERVAL_MS", "ESPN_AFC_LIVE_SYNC_INTERVAL_MS", 2 * 60_000);
+const ESPN_UEFA_PREMATCH_SYNC_CHECK_INTERVAL_MS = getNumberEnv("ESPN_UEFA_PREMATCH_SYNC_CHECK_INTERVAL_MS", "ESPN_AFC_PREMATCH_SYNC_CHECK_INTERVAL_MS", 10 * 60_000);
+const ESPN_UEFA_PREMATCH_SYNC_FAR_INTERVAL_MS = getNumberEnv("ESPN_UEFA_PREMATCH_SYNC_FAR_INTERVAL_MS", "ESPN_AFC_PREMATCH_SYNC_FAR_INTERVAL_MS", 2 * 60 * 60_000);
+const ESPN_UEFA_PREMATCH_SYNC_NEAR_INTERVAL_MS = getNumberEnv("ESPN_UEFA_PREMATCH_SYNC_NEAR_INTERVAL_MS", "ESPN_AFC_PREMATCH_SYNC_NEAR_INTERVAL_MS", 60 * 60_000);
+const ESPN_UEFA_PREMATCH_NEAR_WINDOW_MS = getNumberEnv("ESPN_UEFA_PREMATCH_NEAR_WINDOW_MS", "ESPN_AFC_PREMATCH_NEAR_WINDOW_MS", 2 * 60 * 60_000);
+const ESPN_UEFA_SYNC_DAYS_AHEAD = getNumberEnv("ESPN_UEFA_SYNC_DAYS_AHEAD", "ESPN_AFC_SYNC_DAYS_AHEAD", 7);
+const ESPN_UEFA_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.champions/scoreboard";
+const ESPN_AFC_AUTO_SYNC_ENABLED = ESPN_UEFA_AUTO_SYNC_ENABLED;
+const ESPN_AFC_AUTO_CLOSE_ENABLED = ESPN_UEFA_AUTO_CLOSE_ENABLED;
+const ESPN_AFC_CREATE_SYNC_INTERVAL_MS = ESPN_UEFA_CREATE_SYNC_INTERVAL_MS;
+const ESPN_AFC_LIVE_SYNC_INTERVAL_MS = ESPN_UEFA_LIVE_SYNC_INTERVAL_MS;
+const ESPN_AFC_PREMATCH_SYNC_CHECK_INTERVAL_MS = ESPN_UEFA_PREMATCH_SYNC_CHECK_INTERVAL_MS;
+const ESPN_AFC_PREMATCH_SYNC_FAR_INTERVAL_MS = ESPN_UEFA_PREMATCH_SYNC_FAR_INTERVAL_MS;
+const ESPN_AFC_PREMATCH_SYNC_NEAR_INTERVAL_MS = ESPN_UEFA_PREMATCH_SYNC_NEAR_INTERVAL_MS;
+const ESPN_AFC_PREMATCH_NEAR_WINDOW_MS = ESPN_UEFA_PREMATCH_NEAR_WINDOW_MS;
+const ESPN_AFC_SYNC_DAYS_AHEAD = ESPN_UEFA_SYNC_DAYS_AHEAD;
+const ESPN_AFC_SCOREBOARD_URL = ESPN_UEFA_SCOREBOARD_URL;
 const ESPN_AFC_ASIAN_CUP_AUTO_SYNC_ENABLED = process.env.ESPN_AFC_ASIAN_CUP_AUTO_SYNC_ENABLED !== "false";
 const ESPN_AFC_ASIAN_CUP_AUTO_CLOSE_ENABLED = process.env.ESPN_AFC_ASIAN_CUP_AUTO_CLOSE_ENABLED !== "false";
 const ESPN_AFC_ASIAN_CUP_CREATE_SYNC_INTERVAL_MS = Number(process.env.ESPN_AFC_ASIAN_CUP_CREATE_SYNC_INTERVAL_MS || 30 * 60_000);
@@ -1762,7 +1787,7 @@ function startAfcCreateSyncScheduler() {
   }
 
   if (!ESPN_AFC_AUTO_SYNC_ENABLED) {
-    console.log("UEFA Champions auto-sync is disabled (ESPN_AFC_AUTO_SYNC_ENABLED=false).");
+    console.log("UEFA Champions auto-sync is disabled (ESPN_UEFA_AUTO_SYNC_ENABLED=false).");
     return;
   }
 
@@ -1779,7 +1804,7 @@ function startAfcLiveSyncScheduler() {
   }
 
   if (!ESPN_AFC_AUTO_SYNC_ENABLED) {
-    console.log("UEFA Champions auto-sync is disabled (ESPN_AFC_AUTO_SYNC_ENABLED=false).");
+    console.log("UEFA Champions auto-sync is disabled (ESPN_UEFA_AUTO_SYNC_ENABLED=false).");
     return;
   }
 
@@ -1796,7 +1821,7 @@ function startAfcPrematchSyncScheduler() {
   }
 
   if (!ESPN_AFC_AUTO_SYNC_ENABLED) {
-    console.log("UEFA Champions auto-sync is disabled (ESPN_AFC_AUTO_SYNC_ENABLED=false).");
+    console.log("UEFA Champions auto-sync is disabled (ESPN_UEFA_AUTO_SYNC_ENABLED=false).");
     return;
   }
 

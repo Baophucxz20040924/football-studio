@@ -192,7 +192,7 @@ module.exports = {
   async execute(interaction) {
     const userName = interaction.user.globalName || interaction.user.username;
     const user = await getOrCreateUser(interaction.user.id, userName);
-    await ensureTradeEngineStarted();
+    await ensureTradeEngineStarted(interaction.channelId);
 
     const overview = await getTradeOverview();
     const initialBet = overview.nextSession

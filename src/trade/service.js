@@ -20,7 +20,8 @@ const state = {
   running: false,
   timerId: null,
   nextBoundaryTime: null,
-  boundaryInProgress: false
+  boundaryInProgress: false,
+  broadcastChannelId: null
 };
 
 function getNow() {
@@ -298,7 +299,8 @@ async function processBoundary(boundaryTime) {
             closePrice: priceSnapshot.price,
             result: settleResult.result,
             betCount: settleResult.betCount,
-            settled: settleResult.settled
+            settled: settleResult.settled,
+            channelId: state.broadcastChannelId
           });
         } catch (broadcastError) {
           console.error("Trade settlement broadcast failed:", broadcastError);
@@ -322,21 +324,22 @@ async function processBoundary(boundaryTime) {
   }
 }
 
-async function startTradeEngine() {
+async function startTradeEngine(channelId = null) {
   if (state.running) {
     return getTradeOverview();
   }
 
   state.running = true;
+  state.broadcastChannelId = channelId || null;
   await ensureUpcomingSession();
   scheduleNextBoundary();
   console.log(`Trade engine started for ${DEFAULT_SYMBOL}.`);
   return getTradeOverview();
 }
 
-async function ensureTradeEngineStarted() {
+async function ensureTradeEngineStarted(channelId = null) {
   if (!state.running) {
-    await startTradeEngine();
+    await startTradeEngine(channelId);
   } else {
     await ensureUpcomingSession();
   }

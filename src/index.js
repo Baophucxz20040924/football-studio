@@ -4006,7 +4006,7 @@ client.once("clientReady", () => {
   });
 
   setSettlementBroadcaster(async (data) => {
-    const { session, closePrice, result, settled } = data;
+    const { session, closePrice, result, settled, channelId } = data;
     const startSec = Math.floor(new Date(session.startTime).getTime() / 1000);
     const endSec = Math.floor(new Date(session.endTime).getTime() / 1000);
 
@@ -4041,16 +4041,17 @@ client.once("clientReady", () => {
       .setDescription(lines.join("\n"))
       .setColor(resultColor);
 
-    const allGuilds = Array.from(client.guilds.cache.values());
-    for (const guild of allGuilds) {
-      try {
-        const channel = await resolveGuildBroadcastChannel(guild);
-        if (channel) {
-          await channel.send({ embeds: [embed] });
-        }
-      } catch (err) {
-        console.error(`Trade broadcast failed for guild ${guild.id}:`, err?.message);
+    if (!channelId) {
+      return;
+    }
+
+    try {
+      const channel = await client.channels.fetch(channelId);
+      if (channel) {
+        await channel.send({ embeds: [embed] });
       }
+    } catch (err) {
+      console.error(`Trade broadcast failed for channel ${channelId}:`, err?.message);
     }
   });
 });

@@ -147,6 +147,18 @@ select {
   min-width: 0;
 }
 
+.filter-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.filter-row input,
+.filter-row select {
+  flex: 1;
+  min-width: 150px;
+}
+
 textarea {
   resize: vertical;
 }

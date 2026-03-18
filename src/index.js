@@ -3676,6 +3676,46 @@ app.get("/api/users", async (req, res) => {
   res.json(users);
 });
 
+app.get("/api/bets", async (req, res) => {
+  try {
+    const bets = await Bet.find({})
+      .sort({ createdAt: -1 })
+      .limit(1000);
+
+    // Populate match info and user info
+    const betsWithInfo = await Promise.all(
+      bets.map(async (bet) => {
+        const match = await Match.findById(bet.matchId);
+        const user = await User.findOne({ userId: bet.userId });
+        
+        return {
+          _id: bet._id,
+          userId: bet.userId,
+          userName: user?.userName || "-",
+          matchId: bet.matchId,
+          matchInfo: match ? {
+            homeTeam: match.homeTeam,
+            awayTeam: match.awayTeam,
+            kickoff: match.kickoff
+          } : null,
+          pickKey: bet.pickKey,
+          amount: bet.amount,
+          multiplier: bet.multiplier,
+          status: bet.status,
+          payout: bet.payout,
+          createdAt: bet.createdAt,
+          updatedAt: bet.updatedAt
+        };
+      })
+    );
+
+    res.json(betsWithInfo);
+  } catch (error) {
+    console.error("Error fetching bets:", error);
+    res.status(500).json({ error: "Failed to fetch bets" });
+  }
+});
+
 app.post("/api/users/:id/balance", async (req, res) => {
   const { id } = req.params;
   const { amount, userName } = req.body || {};

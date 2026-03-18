@@ -40,6 +40,12 @@ async function fetchUsers() {
   renderUsers(users);
 }
 
+async function fetchBetsLogs() {
+  const res = await fetch("/api/bets");
+  const bets = await res.json();
+  renderBetsLogs(bets);
+}
+
 function toKickoffIso(value) {
   if (typeof value !== "string" || !value.trim()) {
     return "";
@@ -704,6 +710,70 @@ function renderUsers(users) {
   });
 }
 
+function renderBetsLogs(bets) {
+  const target = document.getElementById("logs-list");
+  const filterInput = document.getElementById("logs-filter");
+  const statusFilter = document.getElementById("logs-status-filter");
+
+  if (!bets.length) {
+    target.innerHTML = '<p class="card-meta">No bets logged yet.</p>';
+    return;
+  }
+
+  // Filter bets based on search and status
+  let filteredBets = bets;
+  const searchTerm = (filterInput?.value || '').trim().toLowerCase();
+  const statusValue = (statusFilter?.value || '').trim();
+
+  if (searchTerm || statusValue) {
+    filteredBets = bets.filter(bet => {
+      const matchSearch = !searchTerm || 
+        (bet.userName || '').toLowerCase().includes(searchTerm) ||
+        (bet.userId || '').toLowerCase().includes(searchTerm) ||
+        (bet.status || '').toLowerCase().includes(searchTerm);
+      const matchStatus = !statusValue || bet.status === statusValue;
+      return matchSearch && matchStatus;
+    });
+  }
+
+  target.innerHTML = '';
+
+  if (!filteredBets.length) {
+    target.innerHTML = '<p class="card-meta">No matching bets found.</p>';
+    return;
+  }
+
+  // Sort by createdAt descending (most recent first)
+  filteredBets.sort((a, b) => {
+    const dateA = new Date(a.createdAt || 0).getTime();
+    const dateB = new Date(b.createdAt || 0).getTime();
+    return dateB - dateA;
+  });
+
+  filteredBets.forEach((bet) => {
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const userName = bet.userName || bet.userId || "-";
+    const matchInfo = bet.matchInfo ? `${bet.matchInfo.homeTeam} vs ${bet.matchInfo.awayTeam}` : "Match removed";
+    const createdDate = new Date(bet.createdAt).toLocaleString();
+    const statusColor = bet.status === "won" ? "#6ae4c5" : bet.status === "lost" ? "#ff6b6b" : "#f6c244";
+
+    card.innerHTML = `
+      <div class="card-title">${userName}</div>
+      <div class="card-meta">User ID: ${bet.userId}</div>
+      <div class="card-meta">Match: ${matchInfo}</div>
+      <div class="card-meta">Pick: ${bet.pickKey}</div>
+      <div class="card-meta">Amount: ${bet.amount} | Multiplier: x${bet.multiplier}</div>
+      <div class="card-meta">Status: <span style="color: ${statusColor}">${bet.status.toUpperCase()}</span></div>
+      <div class="card-meta">Payout: ${bet.payout || 0}</div>
+      <div class="card-meta">Time: ${createdDate}</div>
+    `;
+
+    target.appendChild(card);
+  });
+}
+
 const form = document.getElementById("create-form");
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -782,7 +852,21 @@ broadcastForm.addEventListener("submit", async (event) => {
   broadcastForm.reset();
 });
 
-Promise.all([fetchMatches(), fetchUsers()]).catch((err) => {
+// Setup logs filter
+const logsFilterInput = document.getElementById("logs-filter");
+const logsStatusFilter = document.getElementById("logs-status-filter");
+if (logsFilterInput) {
+  logsFilterInput.addEventListener("input", () => {
+    fetchBetsLogs();
+  });
+}
+if (logsStatusFilter) {
+  logsStatusFilter.addEventListener("change", () => {
+    fetchBetsLogs();
+  });
+}
+
+Promise.all([fetchMatches(), fetchUsers(), fetchBetsLogs()]).catch((err) => {
   console.error(err);
 });
 

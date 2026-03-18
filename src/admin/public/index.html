@@ -27,6 +27,7 @@
         <button class="tab-btn active" data-tab="manage">Manage</button>
         <button class="tab-btn" data-tab="closed">Closed</button>
         <button class="tab-btn" data-tab="users">Users</button>
+        <button class="tab-btn" data-tab="logs">Bet Logs</button>
       </nav>
 
       <section class="panel tab-page" data-page="manage">
@@ -93,6 +94,20 @@
         </form>
 
         <div id="user-list" class="list"></div>
+      </section>
+
+      <section class="panel tab-page" data-page="logs">
+        <h2>Bet Logs</h2>
+        <div class="filter-row">
+          <input id="logs-filter" type="text" placeholder="Filter by username or status..." />
+          <select id="logs-status-filter">
+            <option value="">All Status</option>
+            <option value="open">Open</option>
+            <option value="won">Won</option>
+            <option value="lost">Lost</option>
+          </select>
+        </div>
+        <div id="logs-list" class="list"></div>
       </section>
     </main>
 

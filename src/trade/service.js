@@ -20,8 +20,7 @@ const state = {
   running: false,
   timerId: null,
   nextBoundaryTime: null,
-  boundaryInProgress: false,
-  broadcastChannelId: null
+  boundaryInProgress: false
 };
 
 function getNow() {
@@ -108,6 +107,10 @@ async function fetchTradePrice(symbol = PRICE_SYMBOL) {
   };
 }
 
+async function getCurrentTradePrice() {
+  return fetchTradePrice();
+}
+
 async function getNextUpcomingSession(now = getNow()) {
   return TradeSession.findOne({
     symbol: DEFAULT_SYMBOL,
@@ -126,11 +129,6 @@ async function getActiveSession(now = getNow()) {
 }
 
 async function ensureUpcomingSession(now = getNow()) {
-  const existing = await getNextUpcomingSession(now);
-  if (existing) {
-    return existing;
-  }
-
   const startTime = getNextBoundary(now);
   const endTime = addInterval(startTime, 1);
 
@@ -151,6 +149,10 @@ async function ensureUpcomingSession(now = getNow()) {
       setDefaultsOnInsert: true
     }
   );
+}
+
+async function getBettableSession(now = getNow()) {
+  return ensureUpcomingSession(now);
 }
 
 async function ensureFollowingUpcomingSession(boundaryTime) {
@@ -248,11 +250,14 @@ async function settleSession(session, closePrice, settledAt) {
     result,
     betCount: bets.length,
     settled: bets.map((bet) => ({
+      userId: bet.userId,
       userName: bet.userName || bet.userId,
       direction: bet.direction,
       amount: bet.amount,
       status: bet.status,
-      payout: bet.payout
+      payout: bet.payout,
+      channelId: bet.channelId || "",
+      messageId: bet.messageId || ""
     }))
   };
 }
@@ -294,24 +299,31 @@ async function processBoundary(boundaryTime) {
       const settleResult = await settleSession(activeSession, priceSnapshot.price, priceSnapshot.fetchedAt);
       if (settlementBroadcaster) {
         try {
-          settlementBroadcaster({
+          await settlementBroadcaster({
             session: activeSession,
             closePrice: priceSnapshot.price,
+            closeDataAt: priceSnapshot.fetchedAt,
             result: settleResult.result,
             betCount: settleResult.betCount,
-            settled: settleResult.settled,
-            channelId: state.broadcastChannelId
+            settled: settleResult.settled
           });
         } catch (broadcastError) {
           console.error("Trade settlement broadcast failed:", broadcastError);
         }
       }
-      // Dừng engine sau khi chốt 1 phiên
-      stopTradeEngine("session-done");
-      return;
+
+      // Chỉ dừng khi không còn cược open nào đang chờ chốt.
+      const hasPendingOpenBets = await TradeBet.exists({
+        symbol: DEFAULT_SYMBOL,
+        status: "open"
+      });
+      if (!hasPendingOpenBets) {
+        stopTradeEngine("session-done");
+        return;
+      }
     }
 
-    // Chưa có phiên cần chốt — kích hoạt phiên sắp bắt đầu và chờ timer kế
+    // Kích hoạt phiên trùng boundary (nếu có) để chuẩn bị cho lần chốt kế tiếp.
     await activateSessionForBoundary(boundaryTime, priceSnapshot);
   } catch (error) {
     console.error("Trade boundary processing failed:", error);
@@ -324,22 +336,21 @@ async function processBoundary(boundaryTime) {
   }
 }
 
-async function startTradeEngine(channelId = null) {
+async function startTradeEngine() {
   if (state.running) {
     return getTradeOverview();
   }
 
   state.running = true;
-  state.broadcastChannelId = channelId || null;
   await ensureUpcomingSession();
   scheduleNextBoundary();
   console.log(`Trade engine started for ${DEFAULT_SYMBOL}.`);
   return getTradeOverview();
 }
 
-async function ensureTradeEngineStarted(channelId = null) {
+async function ensureTradeEngineStarted() {
   if (!state.running) {
-    await startTradeEngine(channelId);
+    await startTradeEngine();
   } else {
     await ensureUpcomingSession();
   }
@@ -352,7 +363,7 @@ async function getLastSettledSession() {
 
 async function getTradeOverview() {
   const now = getNow();
-  const nextSession = await getNextUpcomingSession(now);
+  const nextSession = await getBettableSession(now);
   const activeSession = await getActiveSession(now);
   const lastSettledSession = await getLastSettledSession();
 
@@ -375,7 +386,7 @@ async function getUserTradeBet(userId, sessionId) {
   return TradeBet.findOne({ userId, sessionId });
 }
 
-async function placeTradeBet({ userId, userName, direction, amount }) {
+async function placeTradeBet({ userId, userName, direction, amount, channelId, messageId }) {
   if (!["up", "down"].includes(direction)) {
     throw new Error("Hướng cược không hợp lệ.");
   }
@@ -385,11 +396,16 @@ async function placeTradeBet({ userId, userName, direction, amount }) {
     throw new Error("Số điểm cược không hợp lệ.");
   }
 
+  const betRequestedAt = getNow();
   await ensureTradeEngineStarted();
 
-  const session = await getNextUpcomingSession();
+  const session = await getBettableSession(betRequestedAt);
   if (!session) {
     throw new Error("Không tìm thấy phiên trade kế tiếp.");
+  }
+
+  if (new Date(session.startTime).getTime() <= betRequestedAt.getTime()) {
+    throw new Error("Phiên này đã khóa cược, vui lòng đặt cho phiên kế tiếp.");
   }
 
   const user = await User.findOne({ userId });
@@ -418,7 +434,9 @@ async function placeTradeBet({ userId, userName, direction, amount }) {
       sessionId: session._id,
       symbol: DEFAULT_SYMBOL,
       direction,
-      amount: stake
+      amount: stake,
+      channelId: String(channelId || "").trim(),
+      messageId: String(messageId || "").trim()
     });
   } catch (error) {
     user.balance += stake;
@@ -432,7 +450,6 @@ async function placeTradeBet({ userId, userName, direction, amount }) {
   session.betCount += 1;
   session.totalStake += stake;
   await session.save();
-  state.idleSettledSessions = 0;
 
   return {
     bet,
@@ -449,6 +466,7 @@ module.exports = {
   formatPrice,
   formatSessionTime,
   getTradeChartUrl,
+  getCurrentTradePrice,
   getTradeOverview,
   getUserTradeBet,
   placeTradeBet,

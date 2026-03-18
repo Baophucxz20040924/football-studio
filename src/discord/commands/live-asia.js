@@ -1,6 +1,6 @@
 const { SlashCommandBuilder } = require("discord.js");
 const Match = require("../../models/Match");
-const { buildEmbed } = require("./utils");
+const { buildEmbed, buildPagedEmbeds } = require("./utils");
 
 const ASIA_LEAGUES = ["afc_asian_cup", "ksa1"];
 
@@ -50,7 +50,7 @@ module.exports = {
       return interaction.reply({ embeds: [embed] });
     }
 
-    const description = matches
+    const sections = matches
       .map((match) => {
         const score = `${match.scoreHome ?? 0}-${match.scoreAway ?? 0}`;
         const corner = `Corner: ${match.homeTeam}(${match.cornerHome ?? 0}) - ${match.awayTeam}(${match.cornerAway ?? 0})`;
@@ -64,15 +64,15 @@ module.exports = {
           corner,
           goals
         ].join("\n");
-      })
-      .join("\n\n");
+      });
 
-    const embed = buildEmbed({
+    const embeds = buildPagedEmbeds({
       title: "Live Asia matches 🔴",
-      description,
-      color: 0xf36c5c
+      sections,
+      color: 0xf36c5c,
+      emptyDescription: "No Asia games are live right now. 📴"
     });
 
-    return interaction.reply({ embeds: [embed] });
+    return interaction.reply({ embeds });
   }
 };

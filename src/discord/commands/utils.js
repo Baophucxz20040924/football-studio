@@ -28,6 +28,72 @@ function buildEmbed({ title, description, color }) {
     .setColor(color);
 }
 
+function splitEmbedDescriptions(sections, maxLength = 3900) {
+  const normalized = Array.isArray(sections)
+    ? sections
+      .map((section) => (typeof section === "string" ? section.trim() : ""))
+      .filter(Boolean)
+    : [];
+
+  if (normalized.length === 0) {
+    return [];
+  }
+
+  const chunks = [];
+  let current = "";
+
+  const pushCurrent = () => {
+    if (current) {
+      chunks.push(current);
+      current = "";
+    }
+  };
+
+  for (const section of normalized) {
+    const next = current ? `${current}\n\n${section}` : section;
+    if (next.length <= maxLength) {
+      current = next;
+      continue;
+    }
+
+    pushCurrent();
+
+    if (section.length <= maxLength) {
+      current = section;
+      continue;
+    }
+
+    // Guard against a single oversized section to avoid Discord validation errors.
+    chunks.push(`${section.slice(0, Math.max(0, maxLength - 1))}…`);
+  }
+
+  pushCurrent();
+  return chunks;
+}
+
+function buildPagedEmbeds({ title, sections, color, emptyDescription }) {
+  const descriptions = splitEmbedDescriptions(sections);
+  if (descriptions.length === 0) {
+    return [buildEmbed({ title, description: emptyDescription || "No data.", color })];
+  }
+
+  const MAX_EMBEDS = 10;
+  let pages = descriptions.slice(0, MAX_EMBEDS);
+  const omittedPages = Math.max(0, descriptions.length - pages.length);
+  if (omittedPages > 0) {
+    const lastIndex = pages.length - 1;
+    const note = `\n\n_...${omittedPages} page(s) omitted due to Discord embed limit._`;
+    const available = Math.max(0, 3900 - note.length);
+    pages[lastIndex] = `${pages[lastIndex].slice(0, available)}${note}`;
+  }
+
+  const total = pages.length;
+  return pages.map((description, index) => {
+    const pageTitle = total > 1 ? `${title} (${index + 1}/${total})` : title;
+    return buildEmbed({ title: pageTitle, description, color });
+  });
+}
+
 
 // Hỗ trợ nhập 1k, 1m, 1k2, 1.2k, 20k, 300k, 1m2, 2.5m, v.v.
 function parseAmount(input) {
@@ -190,6 +256,7 @@ module.exports = {
   formatOdds,
   formatKickoff,
   buildEmbed,
+  buildPagedEmbeds,
   normalizeAmount,
   formatPoints,
   getOrCreateUser,

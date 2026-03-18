@@ -300,8 +300,6 @@ module.exports = {
       opt.setName("amount").setDescription("Số điểm cược").setRequired(true)
     ),
   async execute(interaction) {
-    await primeEmojiCaches(interaction.guild);
-
     const cardBackEmoji = resolveCardBackEmoji(interaction.guild);
 
     if (!interaction.channel) {
@@ -314,185 +312,246 @@ module.exports = {
     }
 
     const userName = interaction.user.globalName || interaction.user.username;
-    const user = await getOrCreateUser(interaction.user.id, userName);
-    if (user.balance < amount) {
-      return interaction.reply({
-        content: "Không đủ số dư để đặt cược này.",
-        flags: MessageFlags.Ephemeral
+    let user;
+    let wagerReserved = false;
+    let gameSettled = false;
+
+    try {
+      await interaction.deferReply();
+      void primeEmojiCaches(interaction.guild).catch((error) => {
+        console.warn("Failed to prime emoji caches for bj command:", error?.message || error);
       });
-    }
 
-    user.balance -= amount;
-    await user.save();
-
-    const playerCards = [drawCard(interaction.guild), drawCard(interaction.guild)];
-    const dealerCards = [drawCard(interaction.guild), drawCard(interaction.guild)];
-    const gameId = `${interaction.id}-${++gameCounter}`;
-
-    const initialPlayerBj = isBlackjack(playerCards);
-    const initialDealerBj = isBlackjack(dealerCards);
-    const immediateEnd = initialPlayerBj || initialDealerBj;
-
-    if (immediateEnd) {
-      const settlement = settleResult({ playerCards, dealerCards, amount });
-      if (settlement.payout > 0) {
-        user.balance += settlement.payout;
-        await user.save();
-      }
-
-      return interaction.reply(buildGameMessagePayload({
-        playerName: userName,
-        amount,
-        playerCards,
-        dealerCards,
-        revealDealer: true,
-        status: settlement.message,
-        cardBackEmoji
-      }));
-    }
-
-    const replyMessage = await interaction.reply(buildGameMessagePayload({
-      playerName: userName,
-      amount,
-      playerCards,
-      dealerCards,
-      revealDealer: false,
-      status: "Bấm **Hit** để rút thêm, hoặc **Stand** để dừng.",
-      components: [buildControls(gameId)],
-      fetchReply: true,
-      cardBackEmoji
-    }));
-
-    let finished = false;
-
-    const endGame = async (statusMessage) => {
-      if (finished) {
+      user = await getOrCreateUser(interaction.user.id, userName);
+      if (user.balance < amount) {
+        await interaction.editReply({ content: "Không đủ số dư để đặt cược này." });
         return;
       }
-      finished = true;
 
-      const playerTotal = calculateHandValue(playerCards);
-      const needsDealerPlay = playerTotal <= 21;
+      user.balance -= amount;
+      await user.save();
+      wagerReserved = true;
 
-      if (needsDealerPlay) {
-        await replyMessage.edit(buildGameMessagePayload({
+      const playerCards = [drawCard(interaction.guild), drawCard(interaction.guild)];
+      const dealerCards = [drawCard(interaction.guild), drawCard(interaction.guild)];
+      const gameId = `${interaction.id}-${++gameCounter}`;
+
+      const initialPlayerBj = isBlackjack(playerCards);
+      const initialDealerBj = isBlackjack(dealerCards);
+      const immediateEnd = initialPlayerBj || initialDealerBj;
+
+      if (immediateEnd) {
+        const settlement = settleResult({ playerCards, dealerCards, amount });
+        if (settlement.payout > 0) {
+          user.balance += settlement.payout;
+          await user.save();
+        }
+        gameSettled = true;
+
+        await interaction.editReply(buildGameMessagePayload({
           playerName: userName,
           amount,
           playerCards,
           dealerCards,
           revealDealer: true,
-          status: `${statusMessage}\nDealer lật bài...`,
-          components: [buildDisabledControls(gameId)],
+          status: settlement.message,
           cardBackEmoji
         }));
+        return;
+      }
 
-        await sleep(DEALER_DRAW_DELAY_MS);
+      await interaction.editReply(buildGameMessagePayload({
+        playerName: userName,
+        amount,
+        playerCards,
+        dealerCards,
+        revealDealer: false,
+        status: "Bấm **Hit** để rút thêm, hoặc **Stand** để dừng.",
+        components: [buildControls(gameId)],
+        cardBackEmoji
+      }));
+      const replyMessage = await interaction.fetchReply();
 
-        while (calculateHandValue(dealerCards) < 17) {
-          dealerCards.push(drawCard(interaction.guild));
+      let finished = false;
+      const safeEditGameMessage = async (payload) => {
+        try {
+          await replyMessage.edit(payload);
+          return true;
+        } catch (error) {
+          console.warn("Failed to edit bj game message:", error?.message || error);
+          return false;
+        }
+      };
 
-          await replyMessage.edit(buildGameMessagePayload({
+      const endGame = async (statusMessage) => {
+        if (finished) {
+          return;
+        }
+        finished = true;
+
+        const playerTotal = calculateHandValue(playerCards);
+        const needsDealerPlay = playerTotal <= 21;
+
+        if (needsDealerPlay) {
+          await safeEditGameMessage(buildGameMessagePayload({
             playerName: userName,
             amount,
             playerCards,
             dealerCards,
             revealDealer: true,
-            status: `${statusMessage}\nDealer rút thêm 1 lá...`,
+            status: `${statusMessage}\nDealer lật bài...`,
             components: [buildDisabledControls(gameId)],
             cardBackEmoji
           }));
 
           await sleep(DEALER_DRAW_DELAY_MS);
-        }
-      }
 
-      const settlement = settleResult({ playerCards, dealerCards, amount });
-      if (settlement.payout > 0) {
-        user.balance += settlement.payout;
-        await user.save();
-      }
+          while (calculateHandValue(dealerCards) < 17) {
+            dealerCards.push(drawCard(interaction.guild));
 
-      const summary = [
-        statusMessage,
-        settlement.message
-      ].join("\n");
+            await safeEditGameMessage(buildGameMessagePayload({
+              playerName: userName,
+              amount,
+              playerCards,
+              dealerCards,
+              revealDealer: true,
+              status: `${statusMessage}\nDealer rút thêm 1 lá...`,
+              components: [buildDisabledControls(gameId)],
+              cardBackEmoji
+            }));
 
-      await replyMessage.edit(buildGameMessagePayload({
-        playerName: userName,
-        amount,
-        playerCards,
-        dealerCards,
-        revealDealer: true,
-        status: summary,
-        components: [buildDisabledControls(gameId)],
-        cardBackEmoji
-      }));
-    };
-
-    const collector = replyMessage.createMessageComponentCollector({
-      time: GAME_TIMEOUT_MS
-    });
-
-    collector.on("collect", async (btn) => {
-      const [prefix, targetGameId, action] = btn.customId.split(":");
-      if (prefix !== "bj" || targetGameId !== gameId) {
-        await btn.reply({ content: "Ván này đã hết hạn.", flags: MessageFlags.Ephemeral });
-        return;
-      }
-
-      if (btn.user.id !== interaction.user.id) {
-        await btn.reply({ content: "Chỉ người tạo ván mới được bấm nút.", flags: MessageFlags.Ephemeral });
-        return;
-      }
-
-      if (finished) {
-        await btn.reply({ content: "Ván đã kết thúc.", flags: MessageFlags.Ephemeral });
-        return;
-      }
-
-      await btn.deferUpdate();
-
-      if (action === "hit") {
-        playerCards.push(drawCard(interaction.guild));
-        const total = calculateHandValue(playerCards);
-
-        if (total > 21) {
-          collector.stop("player-bust");
-          await endGame("Bạn đã chọn **Hit**.");
-          return;
+            await sleep(DEALER_DRAW_DELAY_MS);
+          }
         }
 
-        if (total === 21) {
-          collector.stop("auto-stand");
-          await endGame("Bạn đạt **21**. Tự động Stand.");
-          return;
+        const settlement = settleResult({ playerCards, dealerCards, amount });
+        if (settlement.payout > 0) {
+          user.balance += settlement.payout;
+          await user.save();
         }
+        gameSettled = true;
 
-        await replyMessage.edit(buildGameMessagePayload({
+        const summary = [
+          statusMessage,
+          settlement.message
+        ].join("\n");
+
+        await safeEditGameMessage(buildGameMessagePayload({
           playerName: userName,
           amount,
           playerCards,
           dealerCards,
-          revealDealer: false,
-          status: "Bạn vừa **Hit**. Tiếp tục Hit hoặc Stand.",
-          components: [buildControls(gameId)],
+          revealDealer: true,
+          status: summary,
+          components: [buildDisabledControls(gameId)],
           cardBackEmoji
         }));
-        return;
+      };
+
+      const collector = replyMessage.createMessageComponentCollector({
+        time: GAME_TIMEOUT_MS
+      });
+
+      collector.on("collect", async (btn) => {
+        try {
+          const [prefix, targetGameId, action] = btn.customId.split(":");
+          if (prefix !== "bj" || targetGameId !== gameId) {
+            await btn.reply({ content: "Ván này đã hết hạn.", flags: MessageFlags.Ephemeral });
+            return;
+          }
+
+          if (btn.user.id !== interaction.user.id) {
+            await btn.reply({ content: "Chỉ người tạo ván mới được bấm nút.", flags: MessageFlags.Ephemeral });
+            return;
+          }
+
+          if (finished) {
+            await btn.reply({ content: "Ván đã kết thúc.", flags: MessageFlags.Ephemeral });
+            return;
+          }
+
+          await btn.deferUpdate();
+
+          if (action === "hit") {
+            playerCards.push(drawCard(interaction.guild));
+            const total = calculateHandValue(playerCards);
+
+            if (total > 21) {
+              collector.stop("player-bust");
+              await endGame("Bạn đã chọn **Hit**.");
+              return;
+            }
+
+            if (total === 21) {
+              collector.stop("auto-stand");
+              await endGame("Bạn đạt **21**. Tự động Stand.");
+              return;
+            }
+
+            await safeEditGameMessage(buildGameMessagePayload({
+              playerName: userName,
+              amount,
+              playerCards,
+              dealerCards,
+              revealDealer: false,
+              status: "Bạn vừa **Hit**. Tiếp tục Hit hoặc Stand.",
+              components: [buildControls(gameId)],
+              cardBackEmoji
+            }));
+            return;
+          }
+
+          collector.stop("player-stand");
+          await endGame("Bạn đã chọn **Stand**.");
+        } catch (error) {
+          console.error("Failed to handle bj button interaction:", error);
+          if (!finished) {
+            collector.stop("collector-error");
+            await endGame("Có lỗi khi xử lý lượt. Tự động **Stand**.");
+          }
+        }
+      });
+
+      collector.on("end", async (_collected, reason) => {
+        try {
+          if (finished) {
+            return;
+          }
+
+          if (reason === "time") {
+            await endGame("Hết thời gian thao tác. Tự động **Stand**.");
+          }
+        } catch (error) {
+          console.error("Failed to finalize bj game collector:", error);
+        }
+      });
+    } catch (error) {
+      console.error("Blackjack command failed:", error);
+
+      let refunded = false;
+      if (user && wagerReserved && !gameSettled) {
+        try {
+          user.balance += amount;
+          await user.save();
+          refunded = true;
+        } catch (refundError) {
+          console.error("Failed to refund bj wager after command error:", refundError);
+        }
       }
 
-      collector.stop("player-stand");
-      await endGame("Bạn đã chọn **Stand**.");
-    });
+      const fallbackContent = refunded
+        ? "Lệnh bj bị lỗi tạm thời. Tiền cược đã được hoàn lại, bạn thử lại giúp mình."
+        : "Lệnh bj bị lỗi tạm thời. Vui lòng thử lại sau ít phút.";
 
-    collector.on("end", async (_collected, reason) => {
-      if (finished) {
-        return;
+      try {
+        if (interaction.deferred || interaction.replied) {
+          await interaction.editReply({ content: fallbackContent, embeds: [], components: [] });
+        } else {
+          await interaction.reply({ content: fallbackContent, flags: MessageFlags.Ephemeral });
+        }
+      } catch (replyError) {
+        console.error("Failed to send bj fallback response:", replyError);
       }
-
-      if (reason === "time") {
-        await endGame("Hết thời gian thao tác. Tự động **Stand**.");
-      }
-    });
+    }
   }
 };

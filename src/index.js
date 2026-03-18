@@ -28,6 +28,7 @@ const MONGODB_URI = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/footba
 const STARTING_BALANCE = Number(process.env.STARTING_BALANCE || 0);
 const MATCH_AUTO_LOCK_INTERVAL_MS = Number(process.env.MATCH_AUTO_LOCK_INTERVAL_MS || 30_000);
 const KICKOFF_UTC_OFFSET_MINUTES = Number(process.env.KICKOFF_UTC_OFFSET_MINUTES || 420);
+const LIVE_AUTO_OFF_AFTER_MS = Number(process.env.LIVE_AUTO_OFF_AFTER_MS || 4 * 60 * 60_000);
 
 function getBooleanEnv(primaryKey, legacyKey, defaultValue = true) {
   const rawValue = process.env[primaryKey] ?? process.env[legacyKey];
@@ -216,6 +217,8 @@ function parseKickoffInput(value) {
 
 async function lockMatchesAtKickoff() {
   const now = new Date();
+  const staleLiveThreshold = new Date(now.getTime() - LIVE_AUTO_OFF_AFTER_MS);
+
   const lockResult = await Match.updateMany(
     {
       status: "open",
@@ -229,11 +232,24 @@ async function lockMatchesAtKickoff() {
     }
   );
 
+  const clearStaleLiveResult = await Match.updateMany(
+    {
+      status: "open",
+      isLive: true,
+      kickoff: { $lte: staleLiveThreshold }
+    },
+    {
+      $set: {
+        isLive: false
+      }
+    }
+  );
+
   const liveResult = await Match.updateMany(
     {
       status: "open",
       isLive: { $ne: true },
-      kickoff: { $lte: now }
+      kickoff: { $gt: staleLiveThreshold, $lte: now }
     },
     {
       $set: {
@@ -248,6 +264,10 @@ async function lockMatchesAtKickoff() {
 
   if (liveResult.modifiedCount > 0) {
     console.log(`Auto-set live for ${liveResult.modifiedCount} match(es) at kickoff.`);
+  }
+
+  if (clearStaleLiveResult.modifiedCount > 0) {
+    console.log(`Auto-cleared live flag for ${clearStaleLiveResult.modifiedCount} stale match(es).`);
   }
 }
 
@@ -1137,6 +1157,11 @@ async function syncEplLiveOddsAndScores() {
         }
       }
 
+      if (isPostState && match.isLive) {
+        match.isLive = false;
+        changed = true;
+      }
+
       if (changed) {
         await match.save();
         updated += 1;
@@ -1450,6 +1475,11 @@ async function syncLaLigaLiveOddsAndScores() {
           autoClosed += 1;
           continue;
         }
+      }
+
+      if (isPostState && match.isLive) {
+        match.isLive = false;
+        changed = true;
       }
 
       if (changed) {
@@ -1767,6 +1797,11 @@ async function syncAfcLiveOddsAndScores() {
         }
       }
 
+      if (isPostState && match.isLive) {
+        match.isLive = false;
+        changed = true;
+      }
+
       if (changed) {
         await match.save();
         updated += 1;
@@ -2080,6 +2115,11 @@ async function syncAfcAsianCupLiveOddsAndScores() {
           autoClosed += 1;
           continue;
         }
+      }
+
+      if (isPostState && match.isLive) {
+        match.isLive = false;
+        changed = true;
       }
 
       if (changed) {
@@ -2397,6 +2437,11 @@ async function syncKsa1LiveOddsAndScores() {
         }
       }
 
+      if (isPostState && match.isLive) {
+        match.isLive = false;
+        changed = true;
+      }
+
       if (changed) {
         await match.save();
         updated += 1;
@@ -2710,6 +2755,11 @@ async function syncNbaLiveOddsAndScores() {
           autoClosed += 1;
           continue;
         }
+      }
+
+      if (isPostState && match.isLive) {
+        match.isLive = false;
+        changed = true;
       }
 
       if (changed) {
@@ -4006,16 +4056,18 @@ client.once("clientReady", () => {
   });
 
   setSettlementBroadcaster(async (data) => {
-    const { session, closePrice, result, settled, channelId } = data;
+    const { session, closePrice, closeDataAt, result, settled } = data;
     const startSec = Math.floor(new Date(session.startTime).getTime() / 1000);
     const endSec = Math.floor(new Date(session.endTime).getTime() / 1000);
+    const closeDataSec = Math.floor(new Date(closeDataAt || session.endTime).getTime() / 1000);
 
     const resultLabel = result === "up" ? "LÊN 📈" : result === "down" ? "XUỐNG 📉" : "HÒA ⚖️";
     const resultColor = result === "up" ? 0x22c55e : result === "down" ? 0xef4444 : 0xfbbf24;
 
     const lines = [
       `Phiên <t:${startSec}:t> → <t:${endSec}:t>`,
-      `Giá: **${formatSettlePrice(session.openPrice)}** → **${formatSettlePrice(closePrice)}**`
+      `Giá: **${formatSettlePrice(session.openPrice)}** → **${formatSettlePrice(closePrice)}**`,
+      `Mốc data đầu ra: **<t:${closeDataSec}:f>**`
     ];
 
     if (settled.length === 0) {
@@ -4041,17 +4093,40 @@ client.once("clientReady", () => {
       .setDescription(lines.join("\n"))
       .setColor(resultColor);
 
-    if (!channelId) {
+    if (!Array.isArray(settled) || settled.length === 0) {
       return;
     }
 
-    try {
-      const channel = await client.channels.fetch(channelId);
-      if (channel) {
-        await channel.send({ embeds: [embed] });
+    for (const bet of settled) {
+      const targetChannelId = String(bet?.channelId || "").trim();
+      const targetMessageId = String(bet?.messageId || "").trim();
+      if (!targetChannelId || !targetMessageId) {
+        continue;
       }
-    } catch (err) {
-      console.error(`Trade broadcast failed for channel ${channelId}:`, err?.message);
+
+      const yourResult = bet.status === "won"
+        ? `✅ Bạn thắng +${formatSettlePrice(bet.payout)}`
+        : bet.status === "lost"
+          ? `❌ Bạn thua -${formatSettlePrice(bet.amount)}`
+          : `↩️ Bạn hòa, hoàn ${formatSettlePrice(bet.amount)}`;
+
+      const perUserEmbed = EmbedBuilder.from(embed).setDescription(`${lines.join("\n")}\n\n${yourResult}`);
+
+      try {
+        const channel = await client.channels.fetch(targetChannelId);
+        if (!channel || typeof channel.messages?.fetch !== "function") {
+          continue;
+        }
+
+        const message = await channel.messages.fetch(targetMessageId);
+        if (!message) {
+          continue;
+        }
+
+        await message.edit({ embeds: [perUserEmbed], components: [] });
+      } catch (err) {
+        console.error(`Trade message edit failed for ${targetChannelId}/${targetMessageId}:`, err?.message);
+      }
     }
   });
 });

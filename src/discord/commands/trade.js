@@ -14,6 +14,7 @@ const {
   TRADE_SESSION_INTERVAL_MINUTES,
   PAYOUT_MULTIPLIER,
   formatPrice,
+  getCurrentTradePrice,
   getTradeOverview,
   getUserTradeBet,
   placeTradeBet,
@@ -21,6 +22,7 @@ const {
 } = require("../../trade/service");
 
 const SESSION_TIMEOUT_MS = 60000;
+const LIVE_PRICE_REFRESH_MS = 5000;
 const QUICK_AMOUNT_OPTIONS = [100, 500, 1000, 5000, 10000];
 
 function formatDirection(direction) {
@@ -45,11 +47,27 @@ function formatDiscordTime(value, style = "t") {
   return `<t:${seconds}:${style}>`;
 }
 
-function buildTradeDescription({ overview, balance, existingBet, selectedDirection, selectedAmount, note }) {
+function toValidLivePrice(value) {
+  const price = Number(value);
+  if (!Number.isFinite(price) || price <= 0) {
+    return null;
+  }
+  return price;
+}
+
+function buildTradeDescription({ overview, balance, existingBet, selectedDirection, selectedAmount, note, livePrice, livePriceAt }) {
   const lines = [
     `Coin: **${overview.symbol || DEFAULT_SYMBOL}**`,
     `Link chart: ${overview.chartUrl}`
   ];
+
+  const validLivePrice = toValidLivePrice(livePrice);
+  if (validLivePrice !== null) {
+    lines.push(`Giá hiện tại: **${formatPrice(validLivePrice)}**`);
+    if (livePriceAt) {
+      lines.push(`Data cập nhật lúc: **${formatDiscordTime(livePriceAt, "T")}**`);
+    }
+  }
 
   if (overview.activeSession) {
     lines.push(
@@ -63,8 +81,8 @@ function buildTradeDescription({ overview, balance, existingBet, selectedDirecti
     lines.push(
       "",
       `Phiên đang nhận cược: **${buildSessionLabel(overview.nextSession)}**`,
-      `Mở phiên lúc: **${formatDiscordTime(overview.nextSession.startTime, "f")}** (${formatDiscordTime(overview.nextSession.startTime, "R")})`,
-      `Đóng phiên lúc: **${formatDiscordTime(overview.nextSession.endTime, "f")}** (${formatDiscordTime(overview.nextSession.endTime, "R")})`
+      "Mở cược: **ngay bây giờ**",
+      `Đóng cược lúc: **${formatDiscordTime(overview.nextSession.endTime, "f")}**`
     );
   }
 
@@ -73,7 +91,8 @@ function buildTradeDescription({ overview, balance, existingBet, selectedDirecti
       "",
       `Phiên vừa chốt: **${buildSessionLabel(overview.lastSettledSession)}**`,
       `Kết quả: **${overview.lastSettledSession.result === "up" ? "Lên" : overview.lastSettledSession.result === "down" ? "Xuống" : "Hòa"}**`,
-      `Gia: **${formatPrice(overview.lastSettledSession.openPrice)}** -> **${formatPrice(overview.lastSettledSession.closePrice)}**`
+      `Giá: **${formatPrice(overview.lastSettledSession.openPrice)}** -> **${formatPrice(overview.lastSettledSession.closePrice)}**`,
+      `Mốc data đầu ra đã chốt: **${formatDiscordTime(overview.lastSettledSession.endTime, "f")}**`
     );
   }
 
@@ -145,17 +164,12 @@ function buildActionRows({ selectedDirection, selectedAmount, disableAll = false
         .setCustomId("trade:confirm")
         .setLabel("Xác nhận")
         .setStyle(ButtonStyle.Success)
-        .setDisabled(disableAll || !selectedDirection || !selectedAmount),
-      new ButtonBuilder()
-        .setCustomId("trade:cancel")
-        .setLabel("Hủy")
-        .setStyle(ButtonStyle.Danger)
-        .setDisabled(disableAll)
+        .setDisabled(disableAll || !selectedDirection || !selectedAmount)
     )
   ];
 }
 
-async function buildTradePanel({ userId, balance, existingBet, selectedDirection, selectedAmount, note, closed }) {
+async function buildTradePanel({ userId, balance, existingBet, selectedDirection, selectedAmount, note, closed, livePrice, livePriceAt }) {
   const overview = await getTradeOverview();
   const sessionMinutes = Number.isFinite(TRADE_SESSION_INTERVAL_MINUTES)
     ? TRADE_SESSION_INTERVAL_MINUTES
@@ -170,7 +184,9 @@ async function buildTradePanel({ userId, balance, existingBet, selectedDirection
       existingBet,
       selectedDirection,
       selectedAmount,
-      note
+      note,
+      livePrice,
+      livePriceAt
     }),
     color: existingBet ? 0x22c55e : 0x6ae4c5
   });
@@ -192,7 +208,7 @@ module.exports = {
   async execute(interaction) {
     const userName = interaction.user.globalName || interaction.user.username;
     const user = await getOrCreateUser(interaction.user.id, userName);
-    await ensureTradeEngineStarted(interaction.channelId);
+    await ensureTradeEngineStarted();
 
     const overview = await getTradeOverview();
     const initialBet = overview.nextSession
@@ -202,14 +218,87 @@ module.exports = {
     let selectedDirection = null;
     let selectedAmount = null;
     let finalized = false;
+    let finalizeReason = "";
+    let panelNote = null;
+    let panelClosed = false;
+    let existingBetState = initialBet || null;
+    let livePrice = null;
+    let livePriceAt = null;
+    let livePriceTimer = null;
+
+    async function refreshLivePriceAndPanel() {
+      try {
+        const overview = await getTradeOverview();
+
+        // Nếu phiên user đã cược đã được chốt, dừng ticker để không đè message kết quả.
+        if (
+          existingBetState &&
+          overview.lastSettledSession &&
+          String(overview.lastSettledSession._id) === String(existingBetState.sessionId)
+        ) {
+          stopLiveTicker();
+          return;
+        }
+
+        const snapshot = await getCurrentTradePrice();
+        livePrice = toValidLivePrice(snapshot?.price);
+        livePriceAt = snapshot?.fetchedAt || new Date();
+
+        await interaction.editReply(await buildTradePanel({
+          userId: interaction.user.id,
+          balance: user.balance,
+          existingBet: existingBetState,
+          selectedDirection,
+          selectedAmount,
+          note: panelNote,
+          closed: panelClosed,
+          livePrice,
+          livePriceAt
+        }));
+      } catch {
+        // Ignore transient fetch/edit errors during live ticker.
+      }
+    }
+
+    function startLiveTicker() {
+      if (livePriceTimer) {
+        return;
+      }
+      livePriceTimer = setInterval(() => {
+        void refreshLivePriceAndPanel();
+      }, LIVE_PRICE_REFRESH_MS);
+    }
+
+    function stopLiveTicker() {
+      if (livePriceTimer) {
+        clearInterval(livePriceTimer);
+        livePriceTimer = null;
+      }
+    }
+
+    // Lấy giá realtime ngay lần đầu để panel vừa hiện đã có giá.
+    try {
+      const snapshot = await getCurrentTradePrice();
+      livePrice = toValidLivePrice(snapshot?.price);
+      livePriceAt = snapshot?.fetchedAt || new Date();
+    } catch {
+      // Ignore initial live-price fetch errors.
+    }
 
     await interaction.reply(await buildTradePanel({
       userId: interaction.user.id,
       balance: user.balance,
-      existingBet: initialBet,
+      existingBet: existingBetState,
       selectedDirection,
-      selectedAmount
+      selectedAmount,
+      note: panelNote,
+      closed: panelClosed,
+      livePrice,
+      livePriceAt
     }));
+
+    startLiveTicker();
+    void refreshLivePriceAndPanel();
 
     if (initialBet) {
       return null;
@@ -229,21 +318,6 @@ module.exports = {
       }
 
       const [, action, value] = componentInteraction.customId.split(":");
-      if (action === "cancel") {
-        finalized = true;
-        collector.stop("cancelled");
-        await componentInteraction.update(await buildTradePanel({
-          userId: interaction.user.id,
-          balance: user.balance,
-          existingBet: null,
-          selectedDirection,
-          selectedAmount,
-          note: "Đã hủy thao tác trade.",
-          closed: true
-        }));
-        return;
-      }
-
       if (action === "dir") {
         selectedDirection = value === "up" ? "up" : value === "down" ? "down" : null;
         if (!selectedDirection) {
@@ -349,22 +423,33 @@ module.exports = {
             userId: interaction.user.id,
             userName,
             direction: selectedDirection,
-            amount: selectedAmount
+            amount: selectedAmount,
+            channelId: componentInteraction.channelId,
+            messageId: componentInteraction.message.id
           });
           user.balance = placed.balance;
+          existingBetState = placed.bet;
+          panelNote = "Đặt cược thành công. Hệ thống sẽ tự động chốt kết quả khi hết phiên.";
+          panelClosed = true;
 
           finalized = true;
+          finalizeReason = "placed";
           collector.stop("placed");
 
           await componentInteraction.update(await buildTradePanel({
             userId: interaction.user.id,
             balance: placed.balance,
-            existingBet: placed.bet,
+            existingBet: existingBetState,
             selectedDirection,
             selectedAmount,
-            note: "Đặt cược thành công. Hệ thống sẽ tự động chốt kết quả khi hết phiên.",
-            closed: true
+            note: panelNote,
+            closed: panelClosed,
+            livePrice,
+            livePriceAt
           }));
+
+          // Vẫn giữ ticker để cập nhật giá 5s/lần cho tới khi phiên active kết thúc.
+          startLiveTicker();
         } catch (error) {
           await componentInteraction.reply({
             content: String(error?.message || "Không thể đặt trade lúc này."),
@@ -375,19 +460,23 @@ module.exports = {
     });
 
     collector.on("end", async () => {
-      if (finalized) {
+      if (finalized && finalizeReason === "placed") {
         return;
       }
 
       try {
+        panelClosed = true;
+        panelNote = "Phiên thao tác đã hết hạn. Gõ /trade để mở lại.";
         await interaction.editReply(await buildTradePanel({
           userId: interaction.user.id,
           balance: user.balance,
           existingBet: null,
           selectedDirection,
           selectedAmount,
-          note: "Phiên thao tác đã hết hạn. Gõ /trade để mở lại.",
-          closed: true
+          note: panelNote,
+          closed: panelClosed,
+          livePrice,
+          livePriceAt
         }));
       } catch {
         // Ignore edit failures when panel expired.

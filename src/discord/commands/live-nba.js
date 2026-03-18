@@ -1,6 +1,6 @@
 const { SlashCommandBuilder } = require("discord.js");
 const Match = require("../../models/Match");
-const { buildEmbed } = require("./utils");
+const { buildEmbed, buildPagedEmbeds } = require("./utils");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -23,7 +23,7 @@ module.exports = {
       return interaction.reply({ embeds: [embed] });
     }
 
-    const description = matches
+    const sections = matches
       .map((match) => {
         const score = `${match.scoreHome ?? 0}-${match.scoreAway ?? 0}`;
 
@@ -31,15 +31,15 @@ module.exports = {
           `**${match.homeTeam} vs ${match.awayTeam}**`,
           `Score: ${score} 🔥`
         ].join("\n");
-      })
-      .join("\n\n");
+      });
 
-    const embed = buildEmbed({
+    const embeds = buildPagedEmbeds({
       title: "Live NBA matches 🔴",
-      description,
-      color: 0xf36c5c
+      sections,
+      color: 0xf36c5c,
+      emptyDescription: "No NBA games are live right now. 📴"
     });
 
-    return interaction.reply({ embeds: [embed] });
+    return interaction.reply({ embeds });
   }
 };

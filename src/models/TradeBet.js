@@ -8,6 +8,8 @@ const TradeBetSchema = new mongoose.Schema(
     symbol: { type: String, required: true, index: true },
     direction: { type: String, enum: ["up", "down"], required: true },
     amount: { type: Number, required: true },
+    channelId: { type: String, default: "" },
+    messageId: { type: String, default: "" },
     status: { type: String, enum: ["open", "won", "lost", "push"], default: "open" },
     payout: { type: Number, default: 0 },
     settledAt: { type: Date, default: null }

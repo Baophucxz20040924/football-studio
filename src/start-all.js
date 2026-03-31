@@ -47,13 +47,14 @@ function runBackground(command, args, name, { shell = false, env = undefined } =
 async function main() {
   const botPort = Number(process.env.PORT || 3000);
   const tienlenPort = Number(process.env.TIENLEN_PORT || 3001);
+  const webNetManagerPort = Number(process.env.WEB_NET_MANAGER_PORT || 5000);
   const hasSkipBuildArg = process.argv.includes("--skip-build");
   const skipTienLenBuild = ["1", "true", "yes"].includes(
     String(process.env.SKIP_TIENLEN_BUILD || "").toLowerCase()
   ) || hasSkipBuildArg;
 
-  console.log(`[start-all] Releasing ports ${botPort} and ${tienlenPort} (if in use)...`);
-  await stopPorts([botPort, tienlenPort], { silent: true });
+  console.log(`[start-all] Releasing ports ${botPort}, ${tienlenPort} and ${webNetManagerPort} (if in use)...`);
+  await stopPorts([botPort, tienlenPort, webNetManagerPort], { silent: true });
 
   if (skipTienLenBuild) {
     console.log("[start-all] SKIP_TIENLEN_BUILD is enabled. Skipping Tien Len frontend build.");
@@ -73,10 +74,10 @@ async function main() {
     { shell: true }
   );
   const webNetManager = runBackground(
-    "node",
-    ["web-net-manager/server.js"],
+    npmCommand,
+    ["run", "start", "--prefix", "web-net-manager"],
     "web-net-manager",
-    { shell: true, env: { PORT: "5000" } }
+    { shell: true, env: { PORT: String(webNetManagerPort) } }
   );
 
   const shutdown = () => {

@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NET STATION</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Net Manager</p>
+          <h1>NET STATION</h1>
+          <p class="hero-copy">Admin quản lý sản phẩm, lịch sử hoạt động và tài khoản. User đăng nhập để trừ số lượng sản phẩm kèm ghi chú bắt buộc.</p>
+        </div>
+      </header>
+
+      <main class="app-grid">
+        <section class="panel auth-panel" id="auth-panel">
+          <h2>Đăng nhập</h2>
+          <form id="login-form" class="stacked-form">
+            <label>
+              <span>Tài khoản</span>
+              <input type="text" name="username" required />
+            </label>
+            <label>
+              <span>Mật khẩu</span>
+              <input type="password" name="password" required />
+            </label>
+            <button type="submit">Đăng nhập</button>
+          </form>
+          <p class="status" id="auth-status"></p>
+        </section>
+
+        <section class="panel hidden" id="dashboard-panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Dashboard</p>
+              <h2 id="welcome-title">Xin chào</h2>
+            </div>
+            <button class="secondary" id="logout-button">Đăng xuất</button>
+          </div>
+
+          <div class="summary-card">
+            <p id="role-summary"></p>
+            <div id="activity-page-link-wrap" class="hidden">
+              <a class="button-link" href="/logs.html">Mở trang lịch sử hoạt động</a>
+            </div>
+          </div>
+
+          <div id="admin-sections" class="hidden">
+            <div class="split-layout">
+              <section>
+                <h3>Sản phẩm</h3>
+                <form id="product-form" class="stacked-form compact-form">
+                  <input type="hidden" name="productId" />
+                  <label>
+                    <span>Tên sản phẩm</span>
+                    <input type="text" name="name" required />
+                  </label>
+                  <label>
+                    <span>Đơn vị</span>
+                    <input type="text" name="unit" required />
+                  </label>
+                  <label>
+                    <span>Số lượng</span>
+                    <input type="number" name="quantity" min="0" required />
+                  </label>
+                  <div class="form-actions">
+                    <button type="submit">Lưu sản phẩm</button>
+                    <button type="button" class="secondary" id="reset-product-form">Mới</button>
+                  </div>
+                </form>
+              </section>
+
+              <section>
+                <h3>Thêm tài khoản</h3>
+                <form id="user-form" class="stacked-form compact-form">
+                  <label>
+                    <span>Tài khoản</span>
+                    <input type="text" name="username" required />
+                  </label>
+                  <label>
+                    <span>Mật khẩu</span>
+                    <input type="password" name="password" required />
+                  </label>
+                  <label>
+                    <span>Vai trò</span>
+                    <select name="role" required>
+                      <option value="user">user</option>
+                      <option value="admin">admin</option>
+                    </select>
+                  </label>
+                  <button type="submit">Tạo tài khoản</button>
+                </form>
+              </section>
+            </div>
+          </div>
+
+          <section>
+            <div class="section-title">
+              <h3>Danh sách sản phẩm</h3>
+              <p id="product-count"></p>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Tên</th>
+                    <th>Đơn vị</th>
+                    <th>Số lượng</th>
+                    <th>Cập nhật</th>
+                    <th id="actions-head">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody id="products-table-body"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section>
+            <h3>Trừ sản phẩm</h3>
+            <form id="deduct-form" class="stacked-form">
+              <label>
+                <span>Sản phẩm</span>
+                <select name="productId" id="deduct-product" required></select>
+              </label>
+              <label>
+                <span>Số lượng trừ</span>
+                <input type="number" name="amount" min="1" required />
+              </label>
+              <label>
+                <span>Ghi chú bắt buộc</span>
+                <textarea name="note" rows="3" required></textarea>
+              </label>
+              <button type="submit">Xác nhận trừ</button>
+            </form>
+          </section>
+
+          <section id="admin-users-section" class="hidden">
+            <div class="section-title">
+              <h3>Tài khoản hệ thống</h3>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Tài khoản</th>
+                    <th>Vai trò</th>
+                    <th>Ngày tạo</th>
+                    <th>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody id="users-table-body"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- Modal sửa tài khoản -->
+          <div id="edit-user-modal" class="modal-overlay hidden">
+            <div class="modal-box">
+              <h3>Sửa tài khoản</h3>
+              <p id="edit-user-label" class="modal-username"></p>
+              <form id="edit-user-form" class="stacked-form compact-form">
+                <input type="hidden" name="userId" />
+                <label>
+                  <span>Mật khẩu mới <small>(bỏ trống nếu không đổi)</small></span>
+                  <input type="password" name="password" autocomplete="new-password" />
+                </label>
+                <label>
+                  <span>Vai trò</span>
+                  <select name="role">
+                    <option value="user">user</option>
+                    <option value="admin">admin</option>
+                  </select>
+                </label>
+                <div class="form-actions">
+                  <button type="submit">Lưu</button>
+                  <button type="button" class="secondary" id="close-edit-user-modal">Hủy</button>
+                </div>
+              </form>
+              <p class="status" id="edit-user-status"></p>
+            </div>
+          </div>
+
+          <p class="status" id="dashboard-status"></p>
+        </section>
+      </main>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

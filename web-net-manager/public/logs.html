@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lịch sử hoạt động</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="page-shell logs-page-shell">
+      <header class="hero logs-hero">
+        <div>
+          <p class="eyebrow">Activity Timeline</p>
+          <h1>Lịch sử hoạt động</h1>
+          <p class="hero-copy">Theo dõi đăng nhập, thao tác sản phẩm và tạo tài khoản. Dữ liệu quá 10 ngày được tự động xóa.</p>
+        </div>
+        <a class="button-link secondary-link" href="/">Về trang chính</a>
+      </header>
+
+      <main class="panel logs-panel">
+        <div class="logs-toolbar">
+          <label class="search-wrap">
+            <span>Tìm kiếm</span>
+            <input id="log-search" type="text" placeholder="Nhập tên user/admin hoặc tên món hàng..." />
+          </label>
+          <button id="refresh-logs" class="secondary">Tải lại</button>
+        </div>
+
+        <p id="logs-status" class="status"></p>
+        <p id="logs-count" class="logs-count"></p>
+
+        <div id="logs-list" class="log-list"></div>
+      </main>
+    </div>
+
+    <script src="/logs.js"></script>
+  </body>
+</html>

@@ -26,6 +26,7 @@ const commands = [
   require("./bcr"),
   require("./bj"),
   require("./tx"),
+  require("./masoi"),
   require("./helpfootball"),
   require("./helpbcr"),
   require("./helpbet"),
@@ -36,6 +37,9 @@ const commands = [
   require("./ranking"),
   require("./epl-rank"),
   require("./donate"),
+  require("./shop"),
+  require("./addshop"),
+  require("./nohu"),
   require("./sync-now")
 ];
 

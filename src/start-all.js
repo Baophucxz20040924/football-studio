@@ -23,10 +23,11 @@ function runAndWait(command, args, { shell = false } = {}) {
   });
 }
 
-function runBackground(command, args, name, { shell = false } = {}) {
+function runBackground(command, args, name, { shell = false, env = undefined } = {}) {
   const child = spawn(command, args, {
     stdio: "inherit",
-    shell
+    shell,
+    env: env ? { ...process.env, ...env } : process.env
   });
 
   child.on("error", (error) => {
@@ -63,7 +64,7 @@ async function main() {
     });
   }
 
-  console.log("[start-all] Starting bot and Tien Len server...");
+  console.log("[start-all] Starting bot, Tien Len server, and web-net-manager...");
   const bot = runBackground("node", ["src/index.js"], "bot");
   const tienlen = runBackground(
     npmCommand,
@@ -71,10 +72,17 @@ async function main() {
     "tienlen-server",
     { shell: true }
   );
+  const webNetManager = runBackground(
+    "node",
+    ["web-net-manager/server.js"],
+    "web-net-manager",
+    { shell: true, env: { PORT: "5000" } }
+  );
 
   const shutdown = () => {
     bot.kill("SIGINT");
     tienlen.kill("SIGINT");
+    webNetManager.kill("SIGINT");
   };
 
   process.on("SIGINT", shutdown);

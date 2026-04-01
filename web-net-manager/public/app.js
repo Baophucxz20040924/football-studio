@@ -86,6 +86,16 @@ function formatCurrency(value) {
   return `${new Intl.NumberFormat('vi-VN').format(Number(value || 0))} VND`;
 }
 
+function getProductStatus(quantity) {
+  if (quantity <= 0) {
+    return { text: 'Hết hàng', class: 'status-out' };
+  }
+  if (quantity < 10) {
+    return { text: 'Gần hết hàng', class: 'status-low' };
+  }
+  return { text: 'Còn hàng', class: 'status-available' };
+}
+
 function updateDeductPriceHint() {
   const productId = Number(elements.deductProduct.value);
   const product = state.products.find((item) => item.id === productId);
@@ -125,26 +135,20 @@ function renderRevenueSummary() {
 function renderProducts() {
   elements.productsTableBody.innerHTML = '';
   elements.productCount.textContent = normalizeText(`${state.products.length} sản phẩm`);
-  elements.actionsHead.textContent = normalizeText(state.user?.role === 'admin' ? 'Thao tác' : 'Trạng thái');
 
   for (const product of state.products) {
     const row = document.createElement('tr');
     const productName = normalizeText(product.name);
     const productUnit = normalizeText(product.unit);
-    const actionsHtml = state.user?.role === 'admin'
-      ? `<div class="actions">
-          <button data-edit-id="${product.id}" class="secondary">Sửa</button>
-          <button data-delete-id="${product.id}" class="danger">Xóa</button>
-        </div>`
-      : '<span>Chỉ được trừ số lượng</span>';
+    const statusInfo = getProductStatus(product.quantity);
 
     row.innerHTML = `
       <td>${productName}</td>
       <td>${productUnit}</td>
       <td>${formatCurrency(product.unit_price || 0)}</td>
       <td>${product.quantity}</td>
+      <td><span class="status-badge ${statusInfo.class}">${normalizeText(statusInfo.text)}</span></td>
       <td>${formatDate(product.updated_at)}</td>
-      <td>${actionsHtml}</td>
     `;
     elements.productsTableBody.appendChild(row);
   }

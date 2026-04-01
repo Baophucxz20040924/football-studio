@@ -135,12 +135,20 @@ function renderRevenueSummary() {
 function renderProducts() {
   elements.productsTableBody.innerHTML = '';
   elements.productCount.textContent = normalizeText(`${state.products.length} sản phẩm`);
+  const isAdmin = state.user?.role === 'admin';
+  elements.actionsHead.textContent = normalizeText(isAdmin ? 'Thao tác' : '');
 
   for (const product of state.products) {
     const row = document.createElement('tr');
     const productName = normalizeText(product.name);
     const productUnit = normalizeText(product.unit);
     const statusInfo = getProductStatus(product.quantity);
+    const actionsHtml = isAdmin
+      ? `<div class="actions">
+          <button data-edit-id="${product.id}" class="secondary">Sửa</button>
+          <button data-delete-id="${product.id}" class="danger">Xóa</button>
+        </div>`
+      : '';
 
     row.innerHTML = `
       <td>${productName}</td>
@@ -149,6 +157,7 @@ function renderProducts() {
       <td>${product.quantity}</td>
       <td><span class="status-badge ${statusInfo.class}">${normalizeText(statusInfo.text)}</span></td>
       <td>${formatDate(product.updated_at)}</td>
+      <td>${actionsHtml}</td>
     `;
     elements.productsTableBody.appendChild(row);
   }

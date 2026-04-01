@@ -2,7 +2,9 @@ const express = require('express');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 const db = require(process.env.USE_MONGODB === 'true' ? './db-mongo' : './db');
+const STORAGE_MODE = process.env.USE_MONGODB === 'true' ? 'MongoDB' : 'data.json';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -573,4 +575,5 @@ app.get('*', (_req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Food manager app is running on http://localhost:${PORT}`);
+  console.log(`Food manager storage mode: ${STORAGE_MODE}`);
 });

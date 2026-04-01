@@ -577,3 +577,6 @@ app.listen(PORT, () => {
   console.log(`Food manager app is running on http://localhost:${PORT}`);
   console.log(`Food manager storage mode: ${STORAGE_MODE}`);
 });
+
+mongosh "mongodb+srv://baophucxz:baophucxz@cluster0.wctasif.mongodb.net/?appName=Cluster0" --eval "db.users.dropIndex('username_1')"
+mongodb+srv://baophucxz:baophucxz@cluster0.wctasif.mongodb.net/?appName=Cluster0

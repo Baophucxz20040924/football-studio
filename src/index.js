@@ -321,18 +321,34 @@ function getNbaDateRangeTokenWithOffsets(startOffsetDays, endOffsetDays) {
 }
 
 async function fetchScoreboardEvents(url, dates) {
-  const response = await fetch(`${url}?dates=${dates}`, {
-    headers: {
-      Accept: "application/json"
-    }
-  });
+  const maxAttempts = 3;
+  let lastError;
 
-  if (!response.ok) {
-    throw new Error(`ESPN scoreboard failed with HTTP ${response.status}`);
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const response = await fetch(`${url}?dates=${dates}`, {
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    });
+
+    if (response.ok) {
+      const payload = await response.json();
+      return Array.isArray(payload?.events) ? payload.events : [];
+    }
+
+    lastError = new Error(`ESPN scoreboard failed with HTTP ${response.status}`);
+
+    if (response.status !== 429 && response.status !== 400) {
+      throw lastError;
+    }
+
+    if (attempt < maxAttempts) {
+      await new Promise((resolve) => setTimeout(resolve, attempt * 5000));
+    }
   }
 
-  const payload = await response.json();
-  return Array.isArray(payload?.events) ? payload.events : [];
+  throw lastError;
 }
 
 function getCompetitionFromEvent(event) {

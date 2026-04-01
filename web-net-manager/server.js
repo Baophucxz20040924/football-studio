@@ -2,7 +2,7 @@ const express = require('express');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const db = require('./db');
+const db = require(process.env.USE_MONGODB === 'true' ? './db-mongo' : './db');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -29,17 +29,17 @@ function createToken(user) {
   });
 }
 
-function getState() {
-  const state = db.readState();
+async function getState() {
+  const state = await db.readState();
   const removedCount = pruneOldActivityLogs(state);
   if (removedCount > 0) {
-    saveState(state);
+    await saveState(state);
   }
   return state;
 }
 
-function saveState(state) {
-  db.writeState(state);
+async function saveState(state) {
+  await db.writeState(state);
 }
 
 function findUserById(state, id) {
@@ -231,8 +231,8 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-function logActivity({ userId, actionType, productId = null, amount = null, note = null, metadata = null }) {
-  const state = getState();
+async function logActivity({ userId, actionType, productId = null, amount = null, note = null, metadata = null }) {
+  const state = await getState();
   state.activity_logs.push({
     id: db.nextId(state, 'logs'),
     user_id: userId,
@@ -243,22 +243,22 @@ function logActivity({ userId, actionType, productId = null, amount = null, note
     metadata,
     created_at: db.now(),
   });
-  saveState(state);
+  await saveState(state);
 }
 
-app.post('/api/login', (req, res) => {
+app.post('/api/login', async (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password) {
     return res.status(400).json({ message: 'Username and password are required' });
   }
 
-  const state = getState();
+  const state = await getState();
   const user = state.users.find((item) => item.username === username);
   if (!user || !bcrypt.compareSync(password, user.password_hash)) {
     return res.status(401).json({ message: 'Không có tên đăng nhập hoặc mật khẩu không đúng' });
   }
 
-  logActivity({
+  await logActivity({
     userId: user.id, 
     actionType: 'LOGIN',
     metadata: { username: user.username, role: user.role },
@@ -270,8 +270,8 @@ app.post('/api/login', (req, res) => {
   });
 });
 
-app.get('/api/me', authenticate, (req, res) => {
-  const state = getState();
+app.get('/api/me', authenticate, async (req, res) => {
+  const state = await getState();
   const user = findUserById(state, req.user.id);
   if (!user) {
     return res.status(404).json({ message: 'User not found' });
@@ -279,13 +279,13 @@ app.get('/api/me', authenticate, (req, res) => {
   return res.json({ user: sanitizeUser(user) });
 });
 
-app.get('/api/products', authenticate, (req, res) => {
-  const state = getState();
+app.get('/api/products', authenticate, async (req, res) => {
+  const state = await getState();
   const products = [...state.products].sort((left, right) => left.name.localeCompare(right.name, 'vi'));
   return res.json({ products });
 });
 
-app.post('/api/products', authenticate, requireAdmin, (req, res) => {
+app.post('/api/products', authenticate, requireAdmin, async (req, res) => {
   const { name, unit, quantity, unit_price: unitPrice } = req.body || {};
   if (!name || !unit || quantity === undefined || unitPrice === undefined) {
     return res.status(400).json({ message: 'Name, unit, quantity and unit price are required' });
@@ -300,7 +300,7 @@ app.post('/api/products', authenticate, requireAdmin, (req, res) => {
     return res.status(400).json({ message: 'Unit price must be a non-negative integer' });
   }
 
-  const state = getState();
+  const state = await getState();
   const product = {
     id: db.nextId(state, 'products'),
     name: name.trim(),
@@ -311,8 +311,8 @@ app.post('/api/products', authenticate, requireAdmin, (req, res) => {
     updated_at: db.now(),
   };
   state.products.push(product);
-  saveState(state);
-  logActivity({
+  await saveState(state);
+  await logActivity({
     userId: req.user.id,
     actionType: 'PRODUCT_CREATE',
     productId: product.id,
@@ -323,7 +323,7 @@ app.post('/api/products', authenticate, requireAdmin, (req, res) => {
   return res.status(201).json({ product });
 });
 
-app.put('/api/products/:id', authenticate, requireAdmin, (req, res) => {
+app.put('/api/products/:id', authenticate, requireAdmin, async (req, res) => {
   const { name, unit, quantity, unit_price: unitPrice } = req.body || {};
   const productId = Number(req.params.id);
   if (!Number.isInteger(productId)) {
@@ -342,7 +342,7 @@ app.put('/api/products/:id', authenticate, requireAdmin, (req, res) => {
     return res.status(400).json({ message: 'Unit price must be a non-negative integer' });
   }
 
-  const state = getState();
+  const state = await getState();
   const existing = findProductById(state, productId);
   if (!existing) {
     return res.status(404).json({ message: 'Product not found' });
@@ -359,10 +359,10 @@ app.put('/api/products/:id', authenticate, requireAdmin, (req, res) => {
   existing.quantity = parsedQuantity;
   existing.unit_price = parsedUnitPrice;
   existing.updated_at = db.now();
-  saveState(state);
+  await saveState(state);
 
   const product = findProductById(state, productId);
-  logActivity({
+  await logActivity({
     userId: req.user.id,
     actionType: 'PRODUCT_UPDATE',
     productId,
@@ -382,21 +382,21 @@ app.put('/api/products/:id', authenticate, requireAdmin, (req, res) => {
   return res.json({ product });
 });
 
-app.delete('/api/products/:id', authenticate, requireAdmin, (req, res) => {
+app.delete('/api/products/:id', authenticate, requireAdmin, async (req, res) => {
   const productId = Number(req.params.id);
   if (!Number.isInteger(productId)) {
     return res.status(400).json({ message: 'Invalid product id' });
   }
 
-  const state = getState();
+  const state = await getState();
   const existing = findProductById(state, productId);
   if (!existing) {
     return res.status(404).json({ message: 'Product not found' });
   }
 
   state.products = state.products.filter((product) => product.id !== productId);
-  saveState(state);
-  logActivity({
+  await saveState(state);
+  await logActivity({
     userId: req.user.id,
     actionType: 'PRODUCT_DELETE',
     productId,
@@ -407,7 +407,7 @@ app.delete('/api/products/:id', authenticate, requireAdmin, (req, res) => {
   return res.json({ success: true });
 });
 
-app.post('/api/products/:id/deduct', authenticate, (req, res) => {
+app.post('/api/products/:id/deduct', authenticate, async (req, res) => {
   const productId = Number(req.params.id);
   const { amount, note } = req.body || {};
   if (!Number.isInteger(productId)) {
@@ -422,7 +422,7 @@ app.post('/api/products/:id/deduct', authenticate, (req, res) => {
     return res.status(400).json({ message: 'A note is required when deducting stock' });
   }
 
-  const state = getState();
+  const state = await getState();
   const product = findProductById(state, productId);
   if (!product) {
     return res.status(404).json({ message: 'Product not found' });
@@ -435,10 +435,10 @@ app.post('/api/products/:id/deduct', authenticate, (req, res) => {
   const revenue = parsedAmount * Number(product.unit_price || 0);
   product.quantity -= parsedAmount;
   product.updated_at = db.now();
-  saveState(state);
+  await saveState(state);
 
   const updatedProduct = findProductById(state, productId);
-  logActivity({
+  await logActivity({
     userId: req.user.id,
     actionType: 'PRODUCT_DEDUCT',
     productId,
@@ -457,15 +457,15 @@ app.post('/api/products/:id/deduct', authenticate, (req, res) => {
   return res.json({ product: updatedProduct, revenue });
 });
 
-app.get('/api/users', authenticate, requireAdmin, (req, res) => {
-  const state = getState();
+app.get('/api/users', authenticate, requireAdmin, async (req, res) => {
+  const state = await getState();
   const users = [...state.users]
     .sort((left, right) => right.id - left.id)
     .map((user) => sanitizeUser(user));
   return res.json({ users });
 });
 
-app.post('/api/users', authenticate, requireAdmin, (req, res) => {
+app.post('/api/users', authenticate, requireAdmin, async (req, res) => {
   const { username, password, role } = req.body || {};
   if (!username || !password || !role) {
     return res.status(400).json({ message: 'Username, password and role are required' });
@@ -474,7 +474,7 @@ app.post('/api/users', authenticate, requireAdmin, (req, res) => {
     return res.status(400).json({ message: 'Role must be admin or user' });
   }
 
-  const state = getState();
+  const state = await getState();
   const existing = state.users.find((user) => user.username === username.trim());
   if (existing) {
     return res.status(409).json({ message: 'Username already exists' });
@@ -488,8 +488,8 @@ app.post('/api/users', authenticate, requireAdmin, (req, res) => {
     created_at: db.now(),
   };
   state.users.push(user);
-  saveState(state);
-  logActivity({
+  await saveState(state);
+  await logActivity({
     userId: req.user.id,
     actionType: 'USER_CREATE',
     note: `Created account ${user.username}`,
@@ -500,10 +500,10 @@ app.post('/api/users', authenticate, requireAdmin, (req, res) => {
 });
 
 // Admin update user (password, role)
-app.put('/api/users/:id', authenticate, requireAdmin, (req, res) => {
+app.put('/api/users/:id', authenticate, requireAdmin, async (req, res) => {
   const { id } = req.params;
   const { password, role } = req.body || {};
-  const state = getState();
+  const state = await getState();
   const user = state.users.find((u) => String(u.id) === String(id));
   if (!user) {
     return res.status(404).json({ message: 'User not found' });
@@ -520,8 +520,8 @@ app.put('/api/users/:id', authenticate, requireAdmin, (req, res) => {
   if (!changed) {
     return res.status(400).json({ message: 'No valid changes (need password >= 4 ký tự hoặc role khác)' });
   }
-  saveState(state);
-  logActivity({
+  await saveState(state);
+  await logActivity({
     userId: req.user.id,
     actionType: 'USER_UPDATE',
     note: `Updated account ${user.username}`,
@@ -530,14 +530,14 @@ app.put('/api/users/:id', authenticate, requireAdmin, (req, res) => {
   return res.json({ user: sanitizeUser(user) });
 });
 
-app.get('/api/revenue-report', authenticate, (req, res) => {
-  const state = getState();
+app.get('/api/revenue-report', authenticate, async (req, res) => {
+  const state = await getState();
   const report = buildRevenueReport(state, req.user);
   return res.json(report);
 });
 
-app.get('/api/activity-logs', authenticate, requireAdmin, (req, res) => {
-  const state = getState();
+app.get('/api/activity-logs', authenticate, requireAdmin, async (req, res) => {
+  const state = await getState();
   const logs = [...state.activity_logs]
     .sort((left, right) => {
       const leftTime = Date.parse(left.created_at);

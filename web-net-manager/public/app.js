@@ -3,6 +3,7 @@ const state = {
   user: null,
   products: [],
   users: [],
+  revenueReport: null,
 };
 
 const elements = {
@@ -14,6 +15,7 @@ const elements = {
   welcomeTitle: document.getElementById('welcome-title'),
   roleSummary: document.getElementById('role-summary'),
   activityPageLinkWrap: document.getElementById('activity-page-link-wrap'),
+  revenuePageLinkWrap: document.getElementById('revenue-page-link-wrap'),
   logoutButton: document.getElementById('logout-button'),
   adminSections: document.getElementById('admin-sections'),
   adminUsersSection: document.getElementById('admin-users-section'),
@@ -24,8 +26,14 @@ const elements = {
   usersTableBody: document.getElementById('users-table-body'),
   deductForm: document.getElementById('deduct-form'),
   deductProduct: document.getElementById('deduct-product'),
+  deductPriceHint: document.getElementById('deduct-price-hint'),
   productCount: document.getElementById('product-count'),
   actionsHead: document.getElementById('actions-head'),
+  dashboardMetrics: document.getElementById('dashboard-metrics'),
+  metricPrimaryLabel: document.getElementById('metric-primary-label'),
+  metricPrimaryValue: document.getElementById('metric-primary-value'),
+  metricSecondaryLabel: document.getElementById('metric-secondary-label'),
+  metricSecondaryValue: document.getElementById('metric-secondary-value'),
   editUserModal: document.getElementById('edit-user-modal'),
   editUserForm: document.getElementById('edit-user-form'),
   editUserLabel: document.getElementById('edit-user-label'),
@@ -74,6 +82,46 @@ function formatDate(value) {
   return new Date(value).toLocaleString('vi-VN');
 }
 
+function formatCurrency(value) {
+  return `${new Intl.NumberFormat('vi-VN').format(Number(value || 0))} VND`;
+}
+
+function updateDeductPriceHint() {
+  const productId = Number(elements.deductProduct.value);
+  const product = state.products.find((item) => item.id === productId);
+  if (!product) {
+    elements.deductPriceHint.textContent = '';
+    return;
+  }
+
+  elements.deductPriceHint.textContent = normalizeText(
+    `Đơn giá hiện tại: ${formatCurrency(product.unit_price || 0)} / ${product.unit}`
+  );
+}
+
+function renderRevenueSummary() {
+  const report = state.revenueReport;
+  const hasUser = Boolean(state.user);
+  elements.dashboardMetrics.classList.toggle('hidden', !hasUser || !report);
+
+  if (!hasUser || !report) {
+    return;
+  }
+
+  if (state.user.role === 'admin') {
+    elements.metricPrimaryLabel.textContent = 'Tổng doanh thu 10 ngày';
+    elements.metricPrimaryValue.textContent = formatCurrency(report.totalRevenue || 0);
+    elements.metricSecondaryLabel.textContent = `Doanh thu ngày ${report.today}`;
+    elements.metricSecondaryValue.textContent = formatCurrency(report.todayRevenue || 0);
+    return;
+  }
+
+  elements.metricPrimaryLabel.textContent = `Doanh thu của bạn ngày ${report.today}`;
+  elements.metricPrimaryValue.textContent = formatCurrency(report.todayRevenue || 0);
+  elements.metricSecondaryLabel.textContent = 'Số lượt bán hôm nay';
+  elements.metricSecondaryValue.textContent = String((report.entries || []).length);
+}
+
 function renderProducts() {
   elements.productsTableBody.innerHTML = '';
   elements.productCount.textContent = normalizeText(`${state.products.length} sản phẩm`);
@@ -93,6 +141,7 @@ function renderProducts() {
     row.innerHTML = `
       <td>${productName}</td>
       <td>${productUnit}</td>
+      <td>${formatCurrency(product.unit_price || 0)}</td>
       <td>${product.quantity}</td>
       <td>${formatDate(product.updated_at)}</td>
       <td>${actionsHtml}</td>
@@ -103,6 +152,7 @@ function renderProducts() {
   elements.deductProduct.innerHTML = state.products
     .map((product) => `<option value="${product.id}">${normalizeText(product.name)} (${product.quantity} ${normalizeText(product.unit)})</option>`)
     .join('');
+  updateDeductPriceHint();
 }
 
 function renderUsers() {
@@ -124,6 +174,7 @@ function fillProductForm(product) {
   elements.productForm.name.value = normalizeText(product.name);
   elements.productForm.unit.value = normalizeText(product.unit);
   elements.productForm.quantity.value = product.quantity;
+  elements.productForm.unit_price.value = Number(product.unit_price || 0);
 }
 
 function resetProductForm() {
@@ -138,19 +189,25 @@ function setAuthenticatedView() {
   elements.adminSections.classList.toggle('hidden', !isAdmin);
   elements.adminUsersSection.classList.toggle('hidden', !isAdmin);
   elements.activityPageLinkWrap.classList.toggle('hidden', !isAdmin);
+  elements.revenuePageLinkWrap.classList.toggle('hidden', !state.user);
 
   if (state.user) {
     elements.welcomeTitle.textContent = normalizeText(`Xin chào ${state.user.username}`);
     elements.roleSummary.textContent = normalizeText(isAdmin
-      ? 'Bạn đang ở vai trò admin: quản lý sản phẩm, tài khoản và xem lịch sử hoạt động.'
-      : 'Bạn đang ở vai trò user: chỉ được xem tồn kho và trừ số lượng sản phẩm kèm ghi chú.');
+      ? 'Bạn đang ở vai trò admin: quản lý sản phẩm, tài khoản, doanh thu và xem lịch sử hoạt động.'
+      : 'Bạn đang ở vai trò user: xem tồn kho, trừ số lượng sản phẩm và chỉ xem doanh thu của chính bạn trong ngày.');
   }
 }
 
 async function loadDashboardData() {
-  const productResponse = await apiFetch('/api/products');
+  const [productResponse, revenueReport] = await Promise.all([
+    apiFetch('/api/products'),
+    apiFetch('/api/revenue-report'),
+  ]);
   state.products = productResponse.products;
+  state.revenueReport = revenueReport;
   renderProducts();
+  renderRevenueSummary();
 
   if (state.user.role === 'admin') {
     const usersResponse = await apiFetch('/api/users');
@@ -174,7 +231,9 @@ async function bootstrap() {
     localStorage.removeItem('token');
     state.token = '';
     state.user = null;
+    state.revenueReport = null;
     setAuthenticatedView();
+    renderRevenueSummary();
   }
 }
 
@@ -211,7 +270,9 @@ elements.logoutButton.addEventListener('click', () => {
   state.user = null;
   state.products = [];
   state.users = [];
+  state.revenueReport = null;
   setAuthenticatedView();
+  renderRevenueSummary();
   elements.productsTableBody.innerHTML = '';
   elements.usersTableBody.innerHTML = '';
   setStatus(elements.dashboardStatus, 'Đã đăng xuất', 'success');
@@ -227,6 +288,7 @@ elements.productForm.addEventListener('submit', async (event) => {
       name: formData.get('name'),
       unit: formData.get('unit'),
       quantity: Number(formData.get('quantity')),
+      unit_price: Number(formData.get('unit_price')),
     };
 
     if (productId) {
@@ -251,6 +313,8 @@ elements.productForm.addEventListener('submit', async (event) => {
 });
 
 elements.resetProductForm.addEventListener('click', resetProductForm);
+
+elements.deductProduct.addEventListener('change', updateDeductPriceHint);
 
 elements.userForm.addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -306,7 +370,7 @@ elements.deductForm.addEventListener('submit', async (event) => {
   const formData = new FormData(elements.deductForm);
 
   try {
-    await apiFetch(`/api/products/${formData.get('productId')}/deduct`, {
+    const data = await apiFetch(`/api/products/${formData.get('productId')}/deduct`, {
       method: 'POST',
       body: JSON.stringify({
         amount: Number(formData.get('amount')),
@@ -315,7 +379,7 @@ elements.deductForm.addEventListener('submit', async (event) => {
     });
     elements.deductForm.reset();
     await loadDashboardData();
-    setStatus(elements.dashboardStatus, 'Trừ sản phẩm thành công', 'success');
+    setStatus(elements.dashboardStatus, `Trừ sản phẩm thành công, cộng doanh thu ${formatCurrency(data.revenue || 0)}`, 'success');
   } catch (error) {
     setStatus(elements.dashboardStatus, error.message, 'error');
   }

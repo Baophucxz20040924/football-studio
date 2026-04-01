@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Doanh thu</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="page-shell logs-page-shell">
+      <header class="hero logs-hero">
+        <div>
+          <p class="eyebrow">Revenue Overview</p>
+          <h1>Doanh thu</h1>
+          <p class="hero-copy" id="revenue-hero-copy">Theo dõi doanh thu theo ngày trong 10 ngày gần nhất.</p>
+        </div>
+        <a class="button-link secondary-link" href="/">Về trang chính</a>
+      </header>
+
+      <main class="panel logs-panel revenue-panel">
+        <p id="revenue-status" class="status"></p>
+
+        <section class="metrics-grid" id="revenue-summary-cards"></section>
+
+        <section id="user-revenue-section" class="hidden">
+          <div class="section-title">
+            <h3>Doanh thu của bạn hôm nay</h3>
+            <p id="user-revenue-date"></p>
+          </div>
+          <div id="user-revenue-list" class="log-list"></div>
+        </section>
+
+        <section id="admin-revenue-section" class="hidden">
+          <div class="section-title">
+            <h3>Doanh thu từng ngày</h3>
+            <p>Hiển thị tối đa 10 ngày gần nhất theo log đã lưu</p>
+          </div>
+          <div id="admin-revenue-days" class="revenue-days"></div>
+        </section>
+      </main>
+    </div>
+
+    <script src="/revenue.js"></script>
+  </body>
+</html>

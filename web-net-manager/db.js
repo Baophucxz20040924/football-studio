@@ -33,6 +33,30 @@ function createInitialState() {
   };
 }
 
+function normalizeProduct(product) {
+  return {
+    ...product,
+    unit_price: Number(product?.unit_price || 0),
+  };
+}
+
+function normalizeState(state) {
+  const initialState = createInitialState();
+  const nextState = {
+    ...initialState,
+    ...state,
+    counters: {
+      ...initialState.counters,
+      ...(state?.counters || {}),
+    },
+    users: Array.isArray(state?.users) ? state.users : initialState.users,
+    products: Array.isArray(state?.products) ? state.products.map(normalizeProduct) : [],
+    activity_logs: Array.isArray(state?.activity_logs) ? state.activity_logs : [],
+  };
+
+  return nextState;
+}
+
 function ensureDbFile() {
   const dirPath = path.dirname(dbPath);
   if (!fs.existsSync(dirPath)) {
@@ -46,7 +70,7 @@ function ensureDbFile() {
 
 function readState() {
   ensureDbFile();
-  return JSON.parse(fs.readFileSync(dbPath, 'utf8'));
+  return normalizeState(JSON.parse(fs.readFileSync(dbPath, 'utf8')));
 }
 
 function writeState(state) {
@@ -65,4 +89,5 @@ module.exports = {
   readState,
   writeState,
   nextId,
+  normalizeState,
 };

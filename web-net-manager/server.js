@@ -9,6 +9,7 @@ const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || 'food-manager-secret';
 const LOG_RETENTION_DAYS = 10;
 const LOG_RETENTION_MS = LOG_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+const REPORT_UTC_OFFSET_MINUTES = Number(process.env.REPORT_UTC_OFFSET_MINUTES || 420);
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -47,6 +48,146 @@ function findUserById(state, id) {
 
 function findProductById(state, id) {
   return state.products.find((product) => product.id === id) || null;
+}
+
+function parseNonNegativeInteger(value) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    return null;
+  }
+
+  return parsed;
+}
+
+function toBusinessDateKey(value) {
+  const timestamp = Date.parse(value);
+  if (Number.isNaN(timestamp)) {
+    return null;
+  }
+
+  const adjusted = new Date(timestamp + REPORT_UTC_OFFSET_MINUTES * 60 * 1000);
+  const year = adjusted.getUTCFullYear();
+  const month = String(adjusted.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(adjusted.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getTodayBusinessDateKey() {
+  return toBusinessDateKey(db.now());
+}
+
+function formatCurrency(amount) {
+  return new Intl.NumberFormat('vi-VN').format(Number(amount || 0));
+}
+
+function getRevenueEntries(state) {
+  return state.activity_logs
+    .filter((item) => item.action_type === 'PRODUCT_DEDUCT')
+    .map((item) => {
+      const user = findUserById(state, item.user_id);
+      const revenue = Number(item.metadata?.revenue || 0);
+      const unitPrice = Number(item.metadata?.unit_price || 0);
+      const quantity = Number(item.amount || 0);
+      const dateKey = toBusinessDateKey(item.created_at);
+
+      return {
+        id: item.id,
+        user_id: item.user_id,
+        username: user ? user.username : 'unknown',
+        role: user ? user.role : 'unknown',
+        product_name: item.metadata?.product_name || null,
+        product_unit: item.metadata?.product_unit || null,
+        quantity,
+        unit_price: unitPrice,
+        revenue,
+        note: item.note,
+        created_at: item.created_at,
+        date_key: dateKey,
+      };
+    })
+    .filter((item) => item.date_key && item.quantity > 0);
+}
+
+function buildRevenueReport(state, currentUser) {
+  const entries = getRevenueEntries(state).sort((left, right) => {
+    const leftTime = Date.parse(left.created_at);
+    const rightTime = Date.parse(right.created_at);
+    return rightTime - leftTime;
+  });
+  const today = getTodayBusinessDateKey();
+
+  if (currentUser.role !== 'admin') {
+    const todayEntries = entries.filter((item) => item.user_id === currentUser.id && item.date_key === today);
+    const todayRevenue = todayEntries.reduce((sum, item) => sum + item.revenue, 0);
+
+    return {
+      scope: 'self',
+      today,
+      todayRevenue,
+      entries: todayEntries,
+    };
+  }
+
+  const daysMap = new Map();
+  let totalRevenue = 0;
+
+  for (const entry of entries) {
+    totalRevenue += entry.revenue;
+    if (!daysMap.has(entry.date_key)) {
+      daysMap.set(entry.date_key, {
+        date_key: entry.date_key,
+        total_revenue: 0,
+        total_quantity: 0,
+        users_map: new Map(),
+      });
+    }
+
+    const dayBucket = daysMap.get(entry.date_key);
+    dayBucket.total_revenue += entry.revenue;
+    dayBucket.total_quantity += entry.quantity;
+
+    if (!dayBucket.users_map.has(entry.user_id)) {
+      dayBucket.users_map.set(entry.user_id, {
+        user_id: entry.user_id,
+        username: entry.username,
+        role: entry.role,
+        total_revenue: 0,
+        total_quantity: 0,
+        entries: [],
+      });
+    }
+
+    const userBucket = dayBucket.users_map.get(entry.user_id);
+    userBucket.total_revenue += entry.revenue;
+    userBucket.total_quantity += entry.quantity;
+    userBucket.entries.push(entry);
+  }
+
+  const days = [...daysMap.values()].map((day) => ({
+    date_key: day.date_key,
+    total_revenue: day.total_revenue,
+    total_quantity: day.total_quantity,
+    users: [...day.users_map.values()].sort((left, right) => right.total_revenue - left.total_revenue),
+  }));
+
+  days.sort((left, right) => right.date_key.localeCompare(left.date_key));
+
+  const todaySummary = days.find((item) => item.date_key === today) || {
+    date_key: today,
+    total_revenue: 0,
+    total_quantity: 0,
+    users: [],
+  };
+
+  return {
+    scope: 'admin',
+    retention_days: LOG_RETENTION_DAYS,
+    today,
+    totalRevenue,
+    totalDays: days.length,
+    todayRevenue: todaySummary.total_revenue,
+    days,
+  };
 }
 
 function pruneOldActivityLogs(state) {
@@ -145,14 +286,18 @@ app.get('/api/products', authenticate, (req, res) => {
 });
 
 app.post('/api/products', authenticate, requireAdmin, (req, res) => {
-  const { name, unit, quantity } = req.body || {};
-  if (!name || !unit || quantity === undefined) {
-    return res.status(400).json({ message: 'Name, unit and quantity are required' });
+  const { name, unit, quantity, unit_price: unitPrice } = req.body || {};
+  if (!name || !unit || quantity === undefined || unitPrice === undefined) {
+    return res.status(400).json({ message: 'Name, unit, quantity and unit price are required' });
   }
 
-  const parsedQuantity = Number(quantity);
-  if (!Number.isInteger(parsedQuantity) || parsedQuantity < 0) {
+  const parsedQuantity = parseNonNegativeInteger(quantity);
+  const parsedUnitPrice = parseNonNegativeInteger(unitPrice);
+  if (parsedQuantity === null) {
     return res.status(400).json({ message: 'Quantity must be a non-negative integer' });
+  }
+  if (parsedUnitPrice === null) {
+    return res.status(400).json({ message: 'Unit price must be a non-negative integer' });
   }
 
   const state = getState();
@@ -161,6 +306,7 @@ app.post('/api/products', authenticate, requireAdmin, (req, res) => {
     name: name.trim(),
     unit: unit.trim(),
     quantity: parsedQuantity,
+    unit_price: parsedUnitPrice,
     created_at: db.now(),
     updated_at: db.now(),
   };
@@ -178,18 +324,22 @@ app.post('/api/products', authenticate, requireAdmin, (req, res) => {
 });
 
 app.put('/api/products/:id', authenticate, requireAdmin, (req, res) => {
-  const { name, unit, quantity } = req.body || {};
+  const { name, unit, quantity, unit_price: unitPrice } = req.body || {};
   const productId = Number(req.params.id);
   if (!Number.isInteger(productId)) {
     return res.status(400).json({ message: 'Invalid product id' });
   }
-  if (!name || !unit || quantity === undefined) {
-    return res.status(400).json({ message: 'Name, unit and quantity are required' });
+  if (!name || !unit || quantity === undefined || unitPrice === undefined) {
+    return res.status(400).json({ message: 'Name, unit, quantity and unit price are required' });
   }
 
-  const parsedQuantity = Number(quantity);
-  if (!Number.isInteger(parsedQuantity) || parsedQuantity < 0) {
+  const parsedQuantity = parseNonNegativeInteger(quantity);
+  const parsedUnitPrice = parseNonNegativeInteger(unitPrice);
+  if (parsedQuantity === null) {
     return res.status(400).json({ message: 'Quantity must be a non-negative integer' });
+  }
+  if (parsedUnitPrice === null) {
+    return res.status(400).json({ message: 'Unit price must be a non-negative integer' });
   }
 
   const state = getState();
@@ -198,10 +348,16 @@ app.put('/api/products/:id', authenticate, requireAdmin, (req, res) => {
     return res.status(404).json({ message: 'Product not found' });
   }
 
-  const before = { name: existing.name, unit: existing.unit, quantity: existing.quantity };
+  const before = {
+    name: existing.name,
+    unit: existing.unit,
+    quantity: existing.quantity,
+    unit_price: Number(existing.unit_price || 0),
+  };
   existing.name = name.trim();
   existing.unit = unit.trim();
   existing.quantity = parsedQuantity;
+  existing.unit_price = parsedUnitPrice;
   existing.updated_at = db.now();
   saveState(state);
 
@@ -214,7 +370,12 @@ app.put('/api/products/:id', authenticate, requireAdmin, (req, res) => {
     note: `Updated product ${product.name}`,
     metadata: {
       before,
-      after: { name: product.name, unit: product.unit, quantity: product.quantity },
+      after: {
+        name: product.name,
+        unit: product.unit,
+        quantity: product.quantity,
+        unit_price: Number(product.unit_price || 0),
+      },
     },
   });
 
@@ -271,6 +432,7 @@ app.post('/api/products/:id/deduct', authenticate, (req, res) => {
   }
 
   const previousQuantity = product.quantity;
+  const revenue = parsedAmount * Number(product.unit_price || 0);
   product.quantity -= parsedAmount;
   product.updated_at = db.now();
   saveState(state);
@@ -285,10 +447,14 @@ app.post('/api/products/:id/deduct', authenticate, (req, res) => {
     metadata: {
       previousQuantity,
       currentQuantity: updatedProduct.quantity,
+      unit_price: Number(product.unit_price || 0),
+      revenue,
+      product_name: product.name,
+      product_unit: product.unit,
     },
   });
 
-  return res.json({ product: updatedProduct });
+  return res.json({ product: updatedProduct, revenue });
 });
 
 app.get('/api/users', authenticate, requireAdmin, (req, res) => {
@@ -362,6 +528,12 @@ app.put('/api/users/:id', authenticate, requireAdmin, (req, res) => {
     metadata: sanitizeUser(user),
   });
   return res.json({ user: sanitizeUser(user) });
+});
+
+app.get('/api/revenue-report', authenticate, (req, res) => {
+  const state = getState();
+  const report = buildRevenueReport(state, req.user);
+  return res.json(report);
 });
 
 app.get('/api/activity-logs', authenticate, requireAdmin, (req, res) => {

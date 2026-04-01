@@ -45,6 +45,19 @@
 
           <div class="summary-card">
             <p id="role-summary"></p>
+            <div class="metrics-grid hidden" id="dashboard-metrics">
+              <article class="metric-card">
+                <p id="metric-primary-label">Doanh thu</p>
+                <strong id="metric-primary-value">0</strong>
+              </article>
+              <article class="metric-card">
+                <p id="metric-secondary-label">Phát sinh</p>
+                <strong id="metric-secondary-value">0</strong>
+              </article>
+            </div>
+            <div id="revenue-page-link-wrap" class="hidden quick-links-row">
+              <a class="button-link" href="/revenue.html">Mở trang doanh thu</a>
+            </div>
             <div id="activity-page-link-wrap" class="hidden">
               <a class="button-link" href="/logs.html">Mở trang lịch sử hoạt động</a>
             </div>
@@ -67,6 +80,10 @@
                   <label>
                     <span>Số lượng</span>
                     <input type="number" name="quantity" min="0" required />
+                  </label>
+                  <label>
+                    <span>Đơn giá</span>
+                    <input type="number" name="unit_price" min="0" required />
                   </label>
                   <div class="form-actions">
                     <button type="submit">Lưu sản phẩm</button>
@@ -110,6 +127,7 @@
                   <tr>
                     <th>Tên</th>
                     <th>Đơn vị</th>
+                    <th>Đơn giá</th>
                     <th>Số lượng</th>
                     <th>Cập nhật</th>
                     <th id="actions-head">Thao tác</th>
@@ -131,6 +149,7 @@
                 <span>Số lượng trừ</span>
                 <input type="number" name="amount" min="1" required />
               </label>
+              <p class="hint-text" id="deduct-price-hint"></p>
               <label>
                 <span>Ghi chú bắt buộc</span>
                 <textarea name="note" rows="3" required></textarea>

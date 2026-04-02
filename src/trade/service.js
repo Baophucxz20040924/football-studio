@@ -280,6 +280,72 @@ async function activateSessionForBoundary(boundaryTime, priceSnapshot) {
   return session;
 }
 
+async function broadcastTradeSettlement({ session, closePrice, closeDataAt, settleResult }) {
+  if (!settlementBroadcaster) {
+    return;
+  }
+
+  try {
+    await settlementBroadcaster({
+      session,
+      closePrice,
+      closeDataAt,
+      result: settleResult.result,
+      betCount: settleResult.betCount,
+      settled: settleResult.settled
+    });
+  } catch (broadcastError) {
+    console.error("Trade settlement broadcast failed:", broadcastError);
+  }
+}
+
+async function settleOverdueActiveSessions(boundaryTime, priceSnapshot) {
+  const sessions = await TradeSession.find({
+    symbol: DEFAULT_SYMBOL,
+    status: "active",
+    endTime: { $lte: boundaryTime }
+  }).sort({ endTime: 1 });
+
+  for (const session of sessions) {
+    const settleResult = await settleSession(session, priceSnapshot.price, priceSnapshot.fetchedAt);
+    await broadcastTradeSettlement({
+      session,
+      closePrice: priceSnapshot.price,
+      closeDataAt: priceSnapshot.fetchedAt,
+      settleResult
+    });
+  }
+
+  return sessions.length;
+}
+
+async function settleMissedUpcomingSessions(boundaryTime, priceSnapshot) {
+  const sessions = await TradeSession.find({
+    symbol: DEFAULT_SYMBOL,
+    status: "upcoming",
+    endTime: { $lte: boundaryTime }
+  }).sort({ endTime: 1 });
+
+  for (const session of sessions) {
+    if (!Number.isFinite(Number(session.openPrice)) || Number(session.openPrice) <= 0) {
+      session.openPrice = priceSnapshot.price;
+      session.priceSource = priceSnapshot.source;
+      await session.save();
+    }
+
+    // Session missed activation at its start boundary; settle as-is to avoid leaving bets stuck.
+    const settleResult = await settleSession(session, priceSnapshot.price, priceSnapshot.fetchedAt);
+    await broadcastTradeSettlement({
+      session,
+      closePrice: priceSnapshot.price,
+      closeDataAt: priceSnapshot.fetchedAt,
+      settleResult
+    });
+  }
+
+  return sessions.length;
+}
+
 async function processBoundary(boundaryTime) {
   if (!state.running || state.boundaryInProgress) {
     return;
@@ -289,42 +355,21 @@ async function processBoundary(boundaryTime) {
 
   try {
     const priceSnapshot = await fetchTradePrice();
-    const activeSession = await TradeSession.findOne({
-      symbol: DEFAULT_SYMBOL,
-      status: "active",
-      endTime: boundaryTime
-    });
-
-    if (activeSession) {
-      const settleResult = await settleSession(activeSession, priceSnapshot.price, priceSnapshot.fetchedAt);
-      if (settlementBroadcaster) {
-        try {
-          await settlementBroadcaster({
-            session: activeSession,
-            closePrice: priceSnapshot.price,
-            closeDataAt: priceSnapshot.fetchedAt,
-            result: settleResult.result,
-            betCount: settleResult.betCount,
-            settled: settleResult.settled
-          });
-        } catch (broadcastError) {
-          console.error("Trade settlement broadcast failed:", broadcastError);
-        }
-      }
-
-      // Chỉ dừng khi không còn cược open nào đang chờ chốt.
-      const hasPendingOpenBets = await TradeBet.exists({
-        symbol: DEFAULT_SYMBOL,
-        status: "open"
-      });
-      if (!hasPendingOpenBets) {
-        stopTradeEngine("session-done");
-        return;
-      }
-    }
+    await settleOverdueActiveSessions(boundaryTime, priceSnapshot);
+    await settleMissedUpcomingSessions(boundaryTime, priceSnapshot);
 
     // Kích hoạt phiên trùng boundary (nếu có) để chuẩn bị cho lần chốt kế tiếp.
     await activateSessionForBoundary(boundaryTime, priceSnapshot);
+
+    // Chỉ dừng khi không còn cược open nào đang chờ chốt.
+    const hasPendingOpenBets = await TradeBet.exists({
+      symbol: DEFAULT_SYMBOL,
+      status: "open"
+    });
+    if (!hasPendingOpenBets) {
+      stopTradeEngine("session-done");
+      return;
+    }
   } catch (error) {
     console.error("Trade boundary processing failed:", error);
   } finally {

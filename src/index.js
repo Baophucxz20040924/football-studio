@@ -10,7 +10,7 @@ const {
   PermissionsBitField,
   EmbedBuilder
 } = require("discord.js");
-const { setSettlementBroadcaster, formatPrice: formatSettlePrice } = require("./trade/service");
+const { setSettlementBroadcaster, formatPrice: formatSettlePrice, ensureTradeEngineStarted } = require("./trade/service");
 require("dotenv").config();
 
 const Match = require("./models/Match");
@@ -4201,6 +4201,9 @@ client.once("clientReady", () => {
 
 async function start() {
   await mongoose.connect(MONGODB_URI);
+  await ensureTradeEngineStarted().catch((error) => {
+    console.error("Initial trade engine start failed:", error);
+  });
   await backfillMatchSports();
   await cleanupOldBettingData().catch((error) => {
     console.error("Initial betting-data cleanup failed:", error);

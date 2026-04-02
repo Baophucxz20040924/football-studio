@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, MessageFlags } = require("discord.js");
+const { SlashCommandBuilder } = require("discord.js");
 const Match = require("../../models/Match");
 const { formatOdds, formatKickoff, buildEmbed, primeEmojiCaches, findEmojiByName } = require("./utils");
 
@@ -91,7 +91,10 @@ module.exports = {
     .setName("epl")
     .setDescription("List open EPL matches"),
   async execute(interaction) {
-    await primeEmojiCaches(interaction.guild).catch(() => null);
+    await interaction.deferReply();
+
+    // Prime emoji cache without blocking the initial slash-command acknowledgement.
+    const emojiPrimePromise = primeEmojiCaches(interaction.guild).catch(() => null);
 
     const matches = await Match.find({
       sport: "football",
@@ -106,8 +109,11 @@ module.exports = {
         description: "No games are open for betting right now. \ud83c\udfdb\ufe0f",
         color: 0x6ae4c5
       });
-      return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+      await emojiPrimePromise;
+      return interaction.editReply({ embeds: [embed] });
     }
+
+    await emojiPrimePromise;
 
     const blocks = matches
       .map((m) => {
@@ -139,7 +145,7 @@ module.exports = {
       color: 0xf6c244
     }));
 
-    await interaction.reply({ embeds: embeds.slice(0, EMBEDS_PER_MESSAGE_MAX) });
+    await interaction.editReply({ embeds: embeds.slice(0, EMBEDS_PER_MESSAGE_MAX) });
 
     for (let i = EMBEDS_PER_MESSAGE_MAX; i < embeds.length; i += EMBEDS_PER_MESSAGE_MAX) {
       await interaction.followUp({ embeds: embeds.slice(i, i + EMBEDS_PER_MESSAGE_MAX) });

@@ -36,12 +36,24 @@ function getBooleanEnv(primaryKey, legacyKey, defaultValue = true) {
     return defaultValue;
   }
 
-  return rawValue !== "false";
+  return String(rawValue).trim().toLowerCase() !== "false";
 }
 
 function getNumberEnv(primaryKey, legacyKey, defaultValue) {
   const rawValue = process.env[primaryKey] ?? process.env[legacyKey];
-  return Number(rawValue ?? defaultValue);
+  if (rawValue === undefined || rawValue === null || rawValue === "") {
+    return defaultValue;
+  }
+
+  const parsed = Number(rawValue);
+  if (!Number.isFinite(parsed)) {
+    console.warn(
+      `Invalid number env for ${primaryKey}${legacyKey ? `/${legacyKey}` : ""}: ${rawValue}. Using default ${defaultValue}.`
+    );
+    return defaultValue;
+  }
+
+  return parsed;
 }
 
 const ESPN_EPL_AUTO_SYNC_ENABLED = process.env.ESPN_EPL_AUTO_SYNC_ENABLED !== "false";

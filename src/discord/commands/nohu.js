@@ -45,8 +45,8 @@ function spinGrid() {
   ));
 }
 
-function evaluateRows(grid) {
-  const winningRows = [];
+function evaluateWinningLines(grid) {
+  const winningLines = [];
   let totalMultiplier = 0;
 
   for (let rowIndex = 0; rowIndex < grid.length; rowIndex += 1) {
@@ -54,13 +54,31 @@ function evaluateRows(grid) {
     if (row.every((emoji) => emoji === row[0])) {
       const multiplier = Number(MULTIPLIER_BY_EMOJI.get(row[0]) || 0);
       if (multiplier > 0) {
-        winningRows.push({ rowIndex, emoji: row[0], multiplier });
+        winningLines.push({ label: `Hàng ${rowIndex + 1}`, emoji: row[0], multiplier });
         totalMultiplier += multiplier;
       }
     }
   }
 
-  return { winningRows, totalMultiplier };
+  const mainDiagonal = grid.map((row, index) => row[index]);
+  if (mainDiagonal.every((emoji) => emoji === mainDiagonal[0])) {
+    const multiplier = Number(MULTIPLIER_BY_EMOJI.get(mainDiagonal[0]) || 0);
+    if (multiplier > 0) {
+      winningLines.push({ label: "Đường chéo", emoji: mainDiagonal[0], multiplier });
+      totalMultiplier += multiplier;
+    }
+  }
+
+  const secondaryDiagonal = grid.map((row, index) => row[GRID_SIZE - 1 - index]);
+  if (secondaryDiagonal.every((emoji) => emoji === secondaryDiagonal[0])) {
+    const multiplier = Number(MULTIPLIER_BY_EMOJI.get(secondaryDiagonal[0]) || 0);
+    if (multiplier > 0) {
+      winningLines.push({ label: "Đường chéo", emoji: secondaryDiagonal[0], multiplier });
+      totalMultiplier += multiplier;
+    }
+  }
+
+  return { winningLines, totalMultiplier };
 }
 
 function isJackpot(grid) {
@@ -71,13 +89,13 @@ function formatGrid(grid) {
   return grid.map((row) => row.join(" ")).join("\n");
 }
 
-function formatWinningRows(winningRows) {
-  if (winningRows.length === 0) {
-    return "Không có hàng nào trùng 3 biểu tượng.";
+function formatWinningLines(winningLines) {
+  if (winningLines.length === 0) {
+    return "Không có hàng hoặc đường chéo nào trùng 3 biểu tượng.";
   }
 
-  return winningRows
-    .map((win) => `Hàng ${win.rowIndex + 1}: ${win.emoji}${win.emoji}${win.emoji} x${win.multiplier}`)
+  return winningLines
+    .map((win) => `${win.label}: ${win.emoji}${win.emoji}${win.emoji} x${win.multiplier}`)
     .join("\n");
 }
 
@@ -166,7 +184,7 @@ module.exports = {
       }
 
       const grid = finalGrid;
-      const { winningRows, totalMultiplier } = evaluateRows(grid);
+      const { winningLines, totalMultiplier } = evaluateWinningLines(grid);
       const basePayout = Math.round(bet * totalMultiplier);
       const jackpotBonus = isJackpot(grid) ? JACKPOT_BONUS : 0;
       const totalPayout = basePayout + jackpotBonus;
@@ -190,8 +208,8 @@ module.exports = {
           formatGrid(grid),
           "",
           `Cược: **${formatPoints(bet)}** điểm`,
-          `Kết quả hàng:`,
-          formatWinningRows(winningRows),
+          `Kết quả trúng:`,
+          formatWinningLines(winningLines),
           `Tổng nhân: **x${totalMultiplier}**`,
           `Trả thưởng: **${formatPoints(totalPayout)}** điểm`,
           `Lãi/Lỗ: **${net >= 0 ? "+" : ""}${formatPoints(net)}** điểm`,

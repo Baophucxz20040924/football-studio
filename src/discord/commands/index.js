@@ -40,6 +40,7 @@ const commands = [
   require("./shop"),
   require("./addshop"),
   require("./nohu"),
+  require("./race"),
   require("./sync-now")
 ];
 

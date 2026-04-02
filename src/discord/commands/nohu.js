@@ -60,24 +60,6 @@ function evaluateWinningLines(grid) {
     }
   }
 
-  const mainDiagonal = grid.map((row, index) => row[index]);
-  if (mainDiagonal.every((emoji) => emoji === mainDiagonal[0])) {
-    const multiplier = Number(MULTIPLIER_BY_EMOJI.get(mainDiagonal[0]) || 0);
-    if (multiplier > 0) {
-      winningLines.push({ label: "Đường chéo", emoji: mainDiagonal[0], multiplier });
-      totalMultiplier += multiplier;
-    }
-  }
-
-  const secondaryDiagonal = grid.map((row, index) => row[GRID_SIZE - 1 - index]);
-  if (secondaryDiagonal.every((emoji) => emoji === secondaryDiagonal[0])) {
-    const multiplier = Number(MULTIPLIER_BY_EMOJI.get(secondaryDiagonal[0]) || 0);
-    if (multiplier > 0) {
-      winningLines.push({ label: "Đường chéo", emoji: secondaryDiagonal[0], multiplier });
-      totalMultiplier += multiplier;
-    }
-  }
-
   return { winningLines, totalMultiplier };
 }
 
@@ -91,7 +73,7 @@ function formatGrid(grid) {
 
 function formatWinningLines(winningLines) {
   if (winningLines.length === 0) {
-    return "Không có hàng hoặc đường chéo nào trùng 3 biểu tượng.";
+    return "Không có hàng nào trùng 3 biểu tượng.";
   }
 
   return winningLines

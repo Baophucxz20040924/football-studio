@@ -35,6 +35,7 @@ module.exports = {
       "\ud83c\udfb2 **/bcr** - Baccarat (Player/Banker/Tie)",
       "🃏 **/bj** - Blackjack (đấu với dealer)",
       "🎯 **/tx** - Tài xỉu (tài/xỉu/chẵn/lẻ/số)",
+      "💠 **/nohuv2** - Nổ hũ 6x6 combo cụm + cascade",
       "🏁 **/race** - Đua xe 8 xe, đặt cược theo tỉ lệ",
       "✈️ **/aviator** - Aviator Crash Game",
       "🃏 **/tienlen** - Tiến Lên Miền Bắc",

@@ -48,16 +48,29 @@ function spinGrid() {
 function evaluateWinningLines(grid) {
   const winningLines = [];
   let totalMultiplier = 0;
+  const addWinningLine = (label, emoji) => {
+    const multiplier = Number(MULTIPLIER_BY_EMOJI.get(emoji) || 0);
+    if (multiplier > 0) {
+      winningLines.push({ label, emoji, multiplier });
+      totalMultiplier += multiplier;
+    }
+  };
 
   for (let rowIndex = 0; rowIndex < grid.length; rowIndex += 1) {
     const row = grid[rowIndex];
     if (row.every((emoji) => emoji === row[0])) {
-      const multiplier = Number(MULTIPLIER_BY_EMOJI.get(row[0]) || 0);
-      if (multiplier > 0) {
-        winningLines.push({ label: `Hàng ${rowIndex + 1}`, emoji: row[0], multiplier });
-        totalMultiplier += multiplier;
-      }
+      addWinningLine(`Hàng ${rowIndex + 1}`, row[0]);
     }
+  }
+
+  const mainDiagonal = [grid[0][0], grid[1][1], grid[2][2]];
+  if (mainDiagonal.every((emoji) => emoji === mainDiagonal[0])) {
+    addWinningLine("Đường chéo", mainDiagonal[0]);
+  }
+
+  const antiDiagonal = [grid[0][2], grid[1][1], grid[2][0]];
+  if (antiDiagonal.every((emoji) => emoji === antiDiagonal[0])) {
+    addWinningLine("Đường chéo", antiDiagonal[0]);
   }
 
   return { winningLines, totalMultiplier };

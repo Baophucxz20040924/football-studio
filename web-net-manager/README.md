@@ -3,7 +3,7 @@
 Ứng dụng quản lý thực phẩm đơn giản với 2 vai trò:
 
 - `admin`: đăng nhập, thêm/sửa/xóa sản phẩm, tạo tài khoản, xem lịch sử hoạt động.
-- `user`: đăng nhập và chỉ được trừ số lượng sản phẩm, bắt buộc ghi note.
+- `user`: đăng nhập và chỉ được trừ số lượng sản phẩm, bắt buộc chọn hình thức thanh toán (tiền mặt/chuyển khoản) và ghi note.
 
 ## Chức năng
 

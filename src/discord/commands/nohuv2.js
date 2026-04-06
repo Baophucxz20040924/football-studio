@@ -333,7 +333,7 @@ function sleep(ms) {
 
 function buildSpinEmbed({ userName, bet, grid, frameIndex, totalFrames }) {
   return buildEmbed({
-    title: "Nổ Hũ V2 6x6 - Đang quay...",
+    title: "Nổ Hũ V2 - Đang quay...",
     description: [
       `Người chơi: **${userName}**`,
       `Cược: **${formatPoints(bet)}** điểm`,
@@ -348,7 +348,7 @@ function buildSpinEmbed({ userName, bet, grid, frameIndex, totalFrames }) {
 
 function buildCascadeEmbed({ userName, bet, step, totalPayoutSoFar }) {
   return buildEmbed({
-    title: `Nổ Hũ V2 6x6 - Cascade ${step.step}`,
+    title: `Nổ Hũ V2 - Cascade ${step.step}`,
     description: [
       `Người chơi: **${userName}**`,
       `Cược: **${formatPoints(bet)}** điểm`,
@@ -364,7 +364,7 @@ function buildCascadeEmbed({ userName, bet, step, totalPayoutSoFar }) {
 
 function buildCascadePreDropEmbed({ userName, bet, step, totalPayoutSoFar }) {
   return buildEmbed({
-    title: `Nổ Hũ V2 6x6 - Combo ${step.step}`,
+    title: `Nổ Hũ V2 - Combo ${step.step}`,
     description: [
       `Người chơi: **${userName}**`,
       `Cược: **${formatPoints(bet)}** điểm`,
@@ -388,7 +388,7 @@ module.exports = {
   simulateNohuV2Round,
   data: new SlashCommandBuilder()
     .setName("nohuv2")
-    .setDescription("Nổ hũ V2 6x6 - combo cụm + cascade")
+    .setDescription("Nổ hũ V2 ")
     .addStringOption((opt) => (
       opt
         .setName("bet")
@@ -482,7 +482,7 @@ module.exports = {
       gameSettled = true;
 
       const net = totalPayout - bet;
-      const title = net >= 0 ? "Nổ Hũ V2 6x6 - Bạn thắng!" : "Nổ Hũ V2 6x6 - Chúc bạn may mắn lần sau";
+      const title = net >= 0 ? "Nổ Hũ V2 - Bạn thắng!" : "Nổ Hũ V2 - Chúc bạn may mắn lần sau";
       const color = net >= 0 ? 0x42d392 : 0xff6b6b;
       const jackpotClusterCount = result.steps.reduce((sum, step) => sum + step.jackpotClusters, 0);
       const jackpotBonus = result.steps.reduce((sum, step) => sum + Math.round(step.baseJackpotBonus * step.multiplier), 0);

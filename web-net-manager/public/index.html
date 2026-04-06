@@ -150,6 +150,13 @@
                 <span>Số lượng trừ</span>
                 <input type="number" name="amount" min="1" required />
               </label>
+              <label>
+                <span>Hình thức thanh toán</span>
+                <select name="payment_method" required>
+                  <option value="cash">Tiền mặt</option>
+                  <option value="bank_transfer">Chuyển khoản</option>
+                </select>
+              </label>
               <p class="hint-text" id="deduct-price-hint"></p>
               <label>
                 <span>Ghi chú bắt buộc</span>

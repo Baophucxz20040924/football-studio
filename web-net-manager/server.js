@@ -12,6 +12,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'food-manager-secret';
 const LOG_RETENTION_DAYS = 10;
 const LOG_RETENTION_MS = LOG_RETENTION_DAYS * 24 * 60 * 60 * 1000;
 const REPORT_UTC_OFFSET_MINUTES = Number(process.env.REPORT_UTC_OFFSET_MINUTES || 420);
+const PAYMENT_METHODS = ['cash', 'bank_transfer'];
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -61,6 +62,11 @@ function parseNonNegativeInteger(value) {
   return parsed;
 }
 
+function normalizePaymentMethod(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  return PAYMENT_METHODS.includes(normalized) ? normalized : null;
+}
+
 function toBusinessDateKey(value) {
   const timestamp = Date.parse(value);
   if (Number.isNaN(timestamp)) {
@@ -99,6 +105,7 @@ function getRevenueEntries(state) {
         role: user ? user.role : 'unknown',
         product_name: item.metadata?.product_name || null,
         product_unit: item.metadata?.product_unit || null,
+        payment_method: normalizePaymentMethod(item.metadata?.payment_method),
         quantity,
         unit_price: unitPrice,
         revenue,
@@ -121,11 +128,19 @@ function buildRevenueReport(state, currentUser) {
   if (currentUser.role !== 'admin') {
     const todayEntries = entries.filter((item) => item.user_id === currentUser.id && item.date_key === today);
     const todayRevenue = todayEntries.reduce((sum, item) => sum + item.revenue, 0);
+    const todayCashRevenue = todayEntries
+      .filter((item) => item.payment_method === 'cash')
+      .reduce((sum, item) => sum + item.revenue, 0);
+    const todayBankTransferRevenue = todayEntries
+      .filter((item) => item.payment_method === 'bank_transfer')
+      .reduce((sum, item) => sum + item.revenue, 0);
 
     return {
       scope: 'self',
       today,
       todayRevenue,
+      todayCashRevenue,
+      todayBankTransferRevenue,
       entries: todayEntries,
     };
   }
@@ -180,6 +195,13 @@ function buildRevenueReport(state, currentUser) {
     total_quantity: 0,
     users: [],
   };
+  const todayEntries = entries.filter((item) => item.date_key === today);
+  const todayCashRevenue = todayEntries
+    .filter((item) => item.payment_method === 'cash')
+    .reduce((sum, item) => sum + item.revenue, 0);
+  const todayBankTransferRevenue = todayEntries
+    .filter((item) => item.payment_method === 'bank_transfer')
+    .reduce((sum, item) => sum + item.revenue, 0);
 
   return {
     scope: 'admin',
@@ -188,6 +210,8 @@ function buildRevenueReport(state, currentUser) {
     totalRevenue,
     totalDays: days.length,
     todayRevenue: todaySummary.total_revenue,
+    todayCashRevenue,
+    todayBankTransferRevenue,
     days,
   };
 }
@@ -411,7 +435,7 @@ app.delete('/api/products/:id', authenticate, requireAdmin, async (req, res) => 
 
 app.post('/api/products/:id/deduct', authenticate, async (req, res) => {
   const productId = Number(req.params.id);
-  const { amount, note } = req.body || {};
+  const { amount, note, payment_method: paymentMethod } = req.body || {};
   if (!Number.isInteger(productId)) {
     return res.status(400).json({ message: 'Invalid product id' });
   }
@@ -422,6 +446,10 @@ app.post('/api/products/:id/deduct', authenticate, async (req, res) => {
   }
   if (!note || !String(note).trim()) {
     return res.status(400).json({ message: 'A note is required when deducting stock' });
+  }
+  const parsedPaymentMethod = normalizePaymentMethod(paymentMethod);
+  if (!parsedPaymentMethod) {
+    return res.status(400).json({ message: 'Payment method must be cash or bank_transfer' });
   }
 
   const state = await getState();
@@ -453,10 +481,11 @@ app.post('/api/products/:id/deduct', authenticate, async (req, res) => {
       revenue,
       product_name: product.name,
       product_unit: product.unit,
+      payment_method: parsedPaymentMethod,
     },
   });
 
-  return res.json({ product: updatedProduct, revenue });
+  return res.json({ product: updatedProduct, revenue, payment_method: parsedPaymentMethod });
 });
 
 app.get('/api/users', authenticate, requireAdmin, async (req, res) => {

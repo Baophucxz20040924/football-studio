@@ -82,7 +82,7 @@ async function resolveDiceFaces(guild) {
 }
 
 function diceToStep(diceValue) {
-  return Number(diceValue) || 0;
+  return Math.ceil(diceValue / 2);
 }
 
 function getDiceFace(diceFaces, diceValue) {
@@ -140,7 +140,7 @@ function buildBetEmbed(round, secondsLeft, totalBets) {
       "Tỉ lệ trả thưởng:",
       oddsText,
       "",
-      "Mỗi lượt cả 8 xe tung xúc xắc (1-6) rồi tiến đúng số bước tương ứng."
+      "Mỗi lượt cả 8 xe tung xúc xắc (1-6) rồi tiến 1-3 bước."
     ].join("\n"),
     color: 0xf6c244
   });
@@ -424,7 +424,7 @@ async function runRaceRound(channel, session, round, bets) {
           diceValues,
           diceFaces: session.diceFaces,
           title: "Đua xe đang diễn ra 🏁",
-          subtitle: "Mỗi xe tung xúc xắc (1-6) và tiến đúng số bước vừa tung.",
+          subtitle: "Mỗi xe tung xúc xắc (1-6) rồi tiến từ 1 đến 3 bước.",
           color: 0x3b82f6
         })
       ]

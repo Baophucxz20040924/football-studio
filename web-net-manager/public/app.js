@@ -387,6 +387,7 @@ elements.deductForm.addEventListener('submit', async (event) => {
       method: 'POST',
       body: JSON.stringify({
         amount: Number(formData.get('amount')),
+        payment_method: formData.get('payment_method'),
         note: formData.get('note'),
       }),
     });

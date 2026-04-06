@@ -28,6 +28,16 @@ function formatDateTime(value) {
   return new Date(value).toLocaleString('vi-VN');
 }
 
+function getPaymentMethodLabel(method) {
+  if (method === 'bank_transfer') {
+    return 'Chuyển khoản';
+  }
+  if (method === 'cash') {
+    return 'Tiền mặt';
+  }
+  return '-';
+}
+
 async function apiFetch(url, options = {}) {
   const response = await fetch(url, {
     ...options,
@@ -65,6 +75,8 @@ function renderUserReport(report) {
 
   renderSummaryCards([
     { label: `Doanh thu ngày ${report.today}`, value: formatCurrency(report.todayRevenue || 0) },
+    { label: 'Tiền mặt hôm nay', value: formatCurrency(report.todayCashRevenue || 0) },
+    { label: 'Chuyển khoản hôm nay', value: formatCurrency(report.todayBankTransferRevenue || 0) },
     { label: 'Số giao dịch hôm nay', value: String((report.entries || []).length) },
   ]);
 
@@ -82,6 +94,7 @@ function renderUserReport(report) {
         </div>
         <p><b>Số lượng:</b> ${entry.quantity} ${normalizeText(entry.product_unit || '')}</p>
         <p><b>Đơn giá:</b> ${formatCurrency(entry.unit_price || 0)}</p>
+        <p><b>Thanh toán:</b> ${normalizeText(getPaymentMethodLabel(entry.payment_method))}</p>
         <p><b>Doanh thu:</b> ${formatCurrency(entry.revenue || 0)}</p>
         <p><b>Ghi chú:</b> ${normalizeText(entry.note || '-')}</p>
       </article>
@@ -97,7 +110,8 @@ function renderAdminReport(report) {
   renderSummaryCards([
     { label: `Tổng doanh thu ${report.retention_days} ngày`, value: formatCurrency(report.totalRevenue || 0) },
     { label: `Doanh thu ngày ${report.today}`, value: formatCurrency(report.todayRevenue || 0) },
-    { label: 'Số ngày có doanh thu', value: String(report.totalDays || 0) },
+    { label: 'Tiền mặt hôm nay', value: formatCurrency(report.todayCashRevenue || 0) },
+    { label: 'Chuyển khoản hôm nay', value: formatCurrency(report.todayBankTransferRevenue || 0) },
   ]);
 
   if (!report.days || report.days.length === 0) {

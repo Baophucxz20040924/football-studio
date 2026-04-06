@@ -26,6 +26,16 @@ function formatDate(value) {
   return new Date(value).toLocaleString('vi-VN');
 }
 
+function getPaymentMethodLabel(method) {
+  if (method === 'bank_transfer') {
+    return 'Chuyển khoản';
+  }
+  if (method === 'cash') {
+    return 'Tiền mặt';
+  }
+  return '-';
+}
+
 async function apiFetch(url, options = {}) {
   const response = await fetch(url, {
     ...options,
@@ -61,6 +71,10 @@ function renderLogs() {
         : 'Món hàng: Không gắn sản phẩm';
       const amountLabel = log.amount ? `Số lượng: ${log.amount}` : 'Số lượng: -';
       const noteLabel = log.note ? `Ghi chú: ${normalizeText(log.note)}` : 'Ghi chú: -';
+      const paymentMethodLabel =
+        log.action_type === 'PRODUCT_DEDUCT'
+          ? `Thanh toán: ${normalizeText(getPaymentMethodLabel(log.metadata?.payment_method))}`
+          : '';
 
       return `
         <article class="log-item log-item-rich">
@@ -71,6 +85,7 @@ function renderLogs() {
           <p><b>Người thao tác:</b> ${userLabel}</p>
           <p><b>${productLabel}</b></p>
           <p>${amountLabel}</p>
+          ${paymentMethodLabel ? `<p>${paymentMethodLabel}</p>` : ''}
           <p>${noteLabel}</p>
         </article>
       `;

@@ -34,6 +34,7 @@ const commands = [
   require("./lixi"),
   require("./work"),
   require("./trade"),
+  require("./tradev2"),
   require("./ranking"),
   require("./epl-rank"),
   require("./donate"),

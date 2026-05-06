@@ -1,9 +1,9 @@
 const { SlashCommandBuilder, MessageFlags } = require("discord.js");
 const { buildEmbed, getOrCreateUser, formatPoints } = require("./utils");
 
-const MIN_REWARD = 50;
-const MAX_REWARD = 300;
-const COOLDOWN_MS = 5 * 60 * 1000;
+const MIN_REWARD = 400;
+const MAX_REWARD = 1500;
+const COOLDOWN_MS = 2 * 60 * 1000;
 
 function randomReward(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -23,7 +23,7 @@ function formatRemaining(ms) {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("work")
-    .setDescription("Làm việc nhận điểm (mỗi 5 phút)"),
+    .setDescription("Làm việc nhận điểm (mỗi 2 phút)"),
   async execute(interaction) {
     const userName = interaction.user.globalName || interaction.user.username;
     const user = await getOrCreateUser(interaction.user.id, userName);
@@ -58,7 +58,7 @@ module.exports = {
       description: [
         `Bạn nhận được: **${formatPoints(reward)}** điểm`,
         `Số dư hiện tại: **${formatPoints(user.balance)}** điểm`,
-        "Bạn có thể dùng lại lệnh sau **5 phút**."
+        "Bạn có thể dùng lại lệnh sau **2 phút**."
       ].join("\n"),
       color: 0x22c55e
     });

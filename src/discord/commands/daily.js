@@ -1,8 +1,8 @@
 const { SlashCommandBuilder } = require("discord.js");
 const { buildEmbed, getOrCreateUser, formatPoints } = require("./utils");
 
-const BASE_REWARD = 80;
-const BONUS_PER_DAY = 10;
+const BASE_REWARD = 500;
+const BONUS_PER_DAY = 120;
 
 function isSameDay(date1, date2) {
   if (!date1 || !date2) return false;

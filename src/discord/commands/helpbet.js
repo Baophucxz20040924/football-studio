@@ -11,6 +11,7 @@ module.exports = {
       "",
       "**Lệnh đặt cược:**",
       "`/bet-epl` - Cược nhanh cho EPL/football",
+      "`/bet-wc` - Cược nhanh cho FIFA World Cup 2026",
       "`/bet-laliga` - Cược nhanh cho LaLiga",
       "`/bet-uefa` - Cược nhanh cho UEFA Champions League",
       "`/bet-asia` - Cược nhanh cho AFC Asian Cup + Saudi Pro League",

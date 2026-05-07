@@ -2,11 +2,13 @@ const { MessageFlags } = require("discord.js");
 
 const commands = [
   require("./matches"),
+  require("./wc"),
   require("./laliga"),
   require("./uefa"),
   require("./asia"),
   require("./nba"),
   require("./bet-epl"),
+  require("./bet-wc"),
   require("./bet-laliga"),
   require("./bet-uefa"),
   require("./bet-asia"),

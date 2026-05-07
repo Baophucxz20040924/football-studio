@@ -116,6 +116,16 @@ const ESPN_KSA1_PREMATCH_SYNC_NEAR_INTERVAL_MS = Number(process.env.ESPN_KSA1_PR
 const ESPN_KSA1_PREMATCH_NEAR_WINDOW_MS = Number(process.env.ESPN_KSA1_PREMATCH_NEAR_WINDOW_MS || 2 * 60 * 60_000);
 const ESPN_KSA1_SYNC_DAYS_AHEAD = Number(process.env.ESPN_KSA1_SYNC_DAYS_AHEAD || 7);
 const ESPN_KSA1_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/soccer/ksa.1/scoreboard";
+const ESPN_WORLDCUP_2026_AUTO_SYNC_ENABLED = process.env.ESPN_WORLDCUP_2026_AUTO_SYNC_ENABLED !== "false";
+const ESPN_WORLDCUP_2026_AUTO_CLOSE_ENABLED = process.env.ESPN_WORLDCUP_2026_AUTO_CLOSE_ENABLED !== "false";
+const ESPN_WORLDCUP_2026_CREATE_SYNC_INTERVAL_MS = Number(process.env.ESPN_WORLDCUP_2026_CREATE_SYNC_INTERVAL_MS || 30 * 60_000);
+const ESPN_WORLDCUP_2026_LIVE_SYNC_INTERVAL_MS = Number(process.env.ESPN_WORLDCUP_2026_LIVE_SYNC_INTERVAL_MS || 2 * 60_000);
+const ESPN_WORLDCUP_2026_PREMATCH_SYNC_CHECK_INTERVAL_MS = Number(process.env.ESPN_WORLDCUP_2026_PREMATCH_SYNC_CHECK_INTERVAL_MS || 10 * 60_000);
+const ESPN_WORLDCUP_2026_PREMATCH_SYNC_FAR_INTERVAL_MS = Number(process.env.ESPN_WORLDCUP_2026_PREMATCH_SYNC_FAR_INTERVAL_MS || 2 * 60 * 60_000);
+const ESPN_WORLDCUP_2026_PREMATCH_SYNC_NEAR_INTERVAL_MS = Number(process.env.ESPN_WORLDCUP_2026_PREMATCH_SYNC_NEAR_INTERVAL_MS || 60 * 60_000);
+const ESPN_WORLDCUP_2026_PREMATCH_NEAR_WINDOW_MS = Number(process.env.ESPN_WORLDCUP_2026_PREMATCH_NEAR_WINDOW_MS || 2 * 60 * 60_000);
+const ESPN_WORLDCUP_2026_SYNC_DAYS_AHEAD = Number(process.env.ESPN_WORLDCUP_2026_SYNC_DAYS_AHEAD || 14);
+const ESPN_WORLDCUP_2026_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard";
 const ESPN_NBA_AUTO_SYNC_ENABLED = process.env.ESPN_NBA_AUTO_SYNC_ENABLED !== "false";
 const ESPN_NBA_AUTO_CLOSE_ENABLED = process.env.ESPN_NBA_AUTO_CLOSE_ENABLED !== "false";
 const ESPN_NBA_CREATE_SYNC_INTERVAL_MS = Number(process.env.ESPN_NBA_CREATE_SYNC_INTERVAL_MS || 30 * 60_000);
@@ -187,6 +197,12 @@ let ksa1LiveSyncIntervalId = null;
 let ksa1CreateSyncInProgress = false;
 let ksa1PrematchSyncInProgress = false;
 let ksa1LiveSyncInProgress = false;
+let worldCup2026CreateSyncIntervalId = null;
+let worldCup2026PrematchSyncIntervalId = null;
+let worldCup2026LiveSyncIntervalId = null;
+let worldCup2026CreateSyncInProgress = false;
+let worldCup2026PrematchSyncInProgress = false;
+let worldCup2026LiveSyncInProgress = false;
 let nbaCreateSyncIntervalId = null;
 let nbaPrematchSyncIntervalId = null;
 let nbaLiveSyncIntervalId = null;
@@ -810,6 +826,19 @@ function buildKsa1MatchFromEspnEvent(event) {
     league: "ksa1",
     oddsExtractor: extractEplOdds,
     eventIdPrefix: "ksa1"
+  });
+}
+
+async function fetchWorldCup2026ScoreboardEvents(dates) {
+  return fetchScoreboardEvents(ESPN_WORLDCUP_2026_SCOREBOARD_URL, dates);
+}
+
+function buildWorldCup2026MatchFromEspnEvent(event) {
+  return buildMatchFromEspnEvent(event, {
+    sport: "football",
+    league: "worldcup_2026",
+    oddsExtractor: extractEplOdds,
+    eventIdPrefix: "worldcup_2026"
   });
 }
 
@@ -2545,6 +2574,326 @@ function startKsa1PrematchSyncScheduler() {
   }, ESPN_KSA1_PREMATCH_SYNC_CHECK_INTERVAL_MS);
 }
 
+async function syncWorldCup2026CreateMatches() {
+  if (!ESPN_WORLDCUP_2026_AUTO_SYNC_ENABLED) {
+    return;
+  }
+
+  if (worldCup2026CreateSyncInProgress) {
+    return;
+  }
+
+  worldCup2026CreateSyncInProgress = true;
+
+  try {
+    const dates = getEplDateRangeToken(ESPN_WORLDCUP_2026_SYNC_DAYS_AHEAD);
+    const events = await fetchWorldCup2026ScoreboardEvents(dates);
+    let created = 0;
+    let updated = 0;
+
+    for (const event of events) {
+      const incoming = buildWorldCup2026MatchFromEspnEvent(event);
+      if (!incoming?.espnEventId) {
+        continue;
+      }
+
+      const existing = await Match.findOne({ espnEventId: incoming.espnEventId, sport: "football", league: "worldcup_2026" });
+      if (!existing) {
+        const matchCode = await generateMatchCode();
+        await Match.create({
+          espnEventId: incoming.espnEventId,
+          sport: "football",
+          league: "worldcup_2026",
+          matchCode,
+          homeTeam: incoming.homeTeam,
+          awayTeam: incoming.awayTeam,
+          stadium: incoming.stadium,
+          kickoff: incoming.kickoff,
+          scoreHome: incoming.hasLiveScore ? incoming.scoreHome : 0,
+          scoreAway: incoming.hasLiveScore ? incoming.scoreAway : 0,
+          odds: incoming.odds,
+          status: "open"
+        });
+        created += 1;
+        continue;
+      }
+
+      if (existing.status !== "open") {
+        continue;
+      }
+
+      let changed = false;
+
+      if (existing.homeTeam !== incoming.homeTeam) {
+        existing.homeTeam = incoming.homeTeam;
+        changed = true;
+      }
+
+      if (existing.awayTeam !== incoming.awayTeam) {
+        existing.awayTeam = incoming.awayTeam;
+        changed = true;
+      }
+
+      const incomingStadium = incoming.stadium || "";
+      if ((existing.stadium || "") !== incomingStadium) {
+        existing.stadium = incomingStadium;
+        changed = true;
+      }
+
+      if (new Date(existing.kickoff).getTime() !== incoming.kickoff.getTime()) {
+        existing.kickoff = incoming.kickoff;
+        changed = true;
+      }
+
+      if (changed) {
+        await existing.save();
+        updated += 1;
+      }
+    }
+
+    if (created > 0 || updated > 0) {
+      console.log(`World Cup 2026 create sync complete: created ${created} match(es), updated ${updated} match(es).`);
+    }
+  } finally {
+    worldCup2026CreateSyncInProgress = false;
+  }
+}
+
+async function syncWorldCup2026PrematchOdds({ forcePrematch = false } = {}) {
+  if (!ESPN_WORLDCUP_2026_AUTO_SYNC_ENABLED) {
+    return;
+  }
+
+  if (worldCup2026PrematchSyncInProgress) {
+    return;
+  }
+
+  worldCup2026PrematchSyncInProgress = true;
+
+  try {
+    const now = new Date();
+    const candidates = await Match.find({
+      sport: "football",
+      league: "worldcup_2026",
+      status: "open",
+      espnEventId: { $exists: true, $ne: "" },
+      kickoff: { $gt: now }
+    });
+
+    if (candidates.length === 0) {
+      return;
+    }
+
+    const dates = getEplDateRangeToken(ESPN_WORLDCUP_2026_SYNC_DAYS_AHEAD);
+    const events = await fetchWorldCup2026ScoreboardEvents(dates);
+    const incomingByEventId = new Map();
+
+    for (const event of events) {
+      const incoming = buildWorldCup2026MatchFromEspnEvent(event);
+      if (incoming?.espnEventId) {
+        incomingByEventId.set(incoming.espnEventId, incoming);
+      }
+    }
+
+    let checked = 0;
+    let oddsUpdated = 0;
+
+    for (const match of candidates) {
+      const incoming = incomingByEventId.get(match.espnEventId);
+      if (!incoming || incoming.odds.length === 0) {
+        continue;
+      }
+
+      const kickoffTime = new Date(match.kickoff).getTime();
+      if (!Number.isFinite(kickoffTime) || kickoffTime <= Date.now()) {
+        continue;
+      }
+
+      const timeToKickoffMs = kickoffTime - Date.now();
+      const requiredIntervalMs = timeToKickoffMs <= ESPN_WORLDCUP_2026_PREMATCH_NEAR_WINDOW_MS
+        ? ESPN_WORLDCUP_2026_PREMATCH_SYNC_NEAR_INTERVAL_MS
+        : ESPN_WORLDCUP_2026_PREMATCH_SYNC_FAR_INTERVAL_MS;
+
+      const lastSyncedAt = match.prematchOddsSyncedAt ? new Date(match.prematchOddsSyncedAt) : null;
+      const lastSyncedMs = lastSyncedAt && Number.isFinite(lastSyncedAt.getTime())
+        ? lastSyncedAt.getTime()
+        : null;
+
+      if (!forcePrematch && lastSyncedMs && (Date.now() - lastSyncedMs) < requiredIntervalMs) {
+        continue;
+      }
+
+      checked += 1;
+      const beforeOdds = JSON.stringify(match.odds || []);
+      const nextOdds = JSON.stringify(incoming.odds);
+
+      match.odds = incoming.odds;
+      match.prematchOddsSyncedAt = now;
+
+      if (beforeOdds !== nextOdds) {
+        oddsUpdated += 1;
+      }
+
+      await match.save();
+    }
+
+    if (checked > 0 || oddsUpdated > 0) {
+      console.log(`World Cup 2026 prematch odds sync: checked ${checked}, updated ${oddsUpdated}.`);
+    }
+  } finally {
+    worldCup2026PrematchSyncInProgress = false;
+  }
+}
+
+async function syncWorldCup2026LiveOddsAndScores() {
+  if (!ESPN_WORLDCUP_2026_AUTO_SYNC_ENABLED) {
+    return;
+  }
+
+  if (worldCup2026LiveSyncInProgress) {
+    return;
+  }
+
+  worldCup2026LiveSyncInProgress = true;
+
+  try {
+    const now = new Date();
+    const candidates = await Match.find({
+      sport: "football",
+      league: "worldcup_2026",
+      status: "open",
+      espnEventId: { $exists: true, $ne: "" },
+      kickoff: { $lte: now }
+    });
+
+    if (candidates.length === 0) {
+      return;
+    }
+
+    const dates = getEplDateRangeTokenWithOffsets(-1, 1);
+    const events = await fetchWorldCup2026ScoreboardEvents(dates);
+    const incomingByEventId = new Map();
+
+    for (const event of events) {
+      const incoming = buildWorldCup2026MatchFromEspnEvent(event);
+      if (incoming?.espnEventId) {
+        incomingByEventId.set(incoming.espnEventId, incoming);
+      }
+    }
+
+    let updated = 0;
+    let scoresUpdated = 0;
+    let autoClosed = 0;
+
+    for (const match of candidates) {
+      const incoming = incomingByEventId.get(match.espnEventId);
+      if (!incoming) {
+        continue;
+      }
+
+      let changed = false;
+
+      match.homeTeam = incoming.homeTeam;
+      match.awayTeam = incoming.awayTeam;
+      match.stadium = incoming.stadium || match.stadium;
+      match.kickoff = incoming.kickoff;
+
+      if (incoming.hasLiveScore) {
+        const scoreChanged = match.scoreHome !== incoming.scoreHome || match.scoreAway !== incoming.scoreAway;
+        match.scoreHome = incoming.scoreHome;
+        match.scoreAway = incoming.scoreAway;
+        if (scoreChanged) {
+          scoresUpdated += 1;
+        }
+        changed = true;
+      }
+
+      const isPostState = incoming.state === "post";
+      if (ESPN_WORLDCUP_2026_AUTO_CLOSE_ENABLED && isPostState) {
+        const winnerKeys = deriveWinnerKeysByScore(incoming.scoreHome, incoming.scoreAway, match.odds);
+        if (winnerKeys.length > 0) {
+          await closeMatchAndSettleBets(match, {
+            winnerKeys,
+            scoreHome: incoming.scoreHome,
+            scoreAway: incoming.scoreAway
+          });
+          autoClosed += 1;
+          continue;
+        }
+      }
+
+      if (isPostState && match.isLive) {
+        match.isLive = false;
+        changed = true;
+      }
+
+      if (changed) {
+        await match.save();
+        updated += 1;
+      }
+    }
+
+    if (updated > 0 || scoresUpdated > 0 || autoClosed > 0) {
+      console.log(
+        `World Cup 2026 live sync complete: updated ${updated}, scores updated ${scoresUpdated}, auto closed ${autoClosed}.`
+      );
+    }
+  } finally {
+    worldCup2026LiveSyncInProgress = false;
+  }
+}
+
+function startWorldCup2026CreateSyncScheduler() {
+  if (worldCup2026CreateSyncIntervalId) {
+    clearInterval(worldCup2026CreateSyncIntervalId);
+  }
+
+  if (!ESPN_WORLDCUP_2026_AUTO_SYNC_ENABLED) {
+    console.log("World Cup 2026 auto-sync is disabled (ESPN_WORLDCUP_2026_AUTO_SYNC_ENABLED=false).");
+    return;
+  }
+
+  worldCup2026CreateSyncIntervalId = setInterval(() => {
+    void syncWorldCup2026CreateMatches().catch((error) => {
+      console.error("Failed to create World Cup 2026 matches from ESPN:", error);
+    });
+  }, ESPN_WORLDCUP_2026_CREATE_SYNC_INTERVAL_MS);
+}
+
+function startWorldCup2026LiveSyncScheduler() {
+  if (worldCup2026LiveSyncIntervalId) {
+    clearInterval(worldCup2026LiveSyncIntervalId);
+  }
+
+  if (!ESPN_WORLDCUP_2026_AUTO_SYNC_ENABLED) {
+    console.log("World Cup 2026 auto-sync is disabled (ESPN_WORLDCUP_2026_AUTO_SYNC_ENABLED=false).");
+    return;
+  }
+
+  worldCup2026LiveSyncIntervalId = setInterval(() => {
+    void syncWorldCup2026LiveOddsAndScores().catch((error) => {
+      console.error("Failed to sync World Cup 2026 live odds/score from ESPN:", error);
+    });
+  }, ESPN_WORLDCUP_2026_LIVE_SYNC_INTERVAL_MS);
+}
+
+function startWorldCup2026PrematchSyncScheduler() {
+  if (worldCup2026PrematchSyncIntervalId) {
+    clearInterval(worldCup2026PrematchSyncIntervalId);
+  }
+
+  if (!ESPN_WORLDCUP_2026_AUTO_SYNC_ENABLED) {
+    console.log("World Cup 2026 auto-sync is disabled (ESPN_WORLDCUP_2026_AUTO_SYNC_ENABLED=false).");
+    return;
+  }
+
+  worldCup2026PrematchSyncIntervalId = setInterval(() => {
+    void syncWorldCup2026PrematchOdds().catch((error) => {
+      console.error("Failed to sync World Cup 2026 prematch odds from ESPN:", error);
+    });
+  }, ESPN_WORLDCUP_2026_PREMATCH_SYNC_CHECK_INTERVAL_MS);
+}
+
 async function syncNbaCreateMatches() {
   if (!ESPN_NBA_AUTO_SYNC_ENABLED) {
     return;
@@ -2996,6 +3345,10 @@ async function runManualSyncNow({ forcePrematch = false } = {}) {
     await syncKsa1CreateMatches();
     await syncKsa1PrematchOdds({ forcePrematch });
     await syncKsa1LiveOddsAndScores();
+
+    await syncWorldCup2026CreateMatches();
+    await syncWorldCup2026PrematchOdds({ forcePrematch });
+    await syncWorldCup2026LiveOddsAndScores();
 
     await syncNbaCreateMatches();
     await syncNbaPrematchOdds({ forcePrematch });
@@ -4394,6 +4747,15 @@ async function start() {
   await syncKsa1LiveOddsAndScores().catch((error) => {
     console.error("Initial KSA live sync failed:", error);
   });
+  await syncWorldCup2026CreateMatches().catch((error) => {
+    console.error("Initial World Cup 2026 create sync failed:", error);
+  });
+  await syncWorldCup2026PrematchOdds().catch((error) => {
+    console.error("Initial World Cup 2026 prematch sync failed:", error);
+  });
+  await syncWorldCup2026LiveOddsAndScores().catch((error) => {
+    console.error("Initial World Cup 2026 live sync failed:", error);
+  });
   await syncNbaCreateMatches().catch((error) => {
     console.error("Initial NBA create sync failed:", error);
   });
@@ -4420,6 +4782,9 @@ async function start() {
   startKsa1CreateSyncScheduler();
   startKsa1PrematchSyncScheduler();
   startKsa1LiveSyncScheduler();
+  startWorldCup2026CreateSyncScheduler();
+  startWorldCup2026PrematchSyncScheduler();
+  startWorldCup2026LiveSyncScheduler();
   startNbaCreateSyncScheduler();
   startNbaPrematchSyncScheduler();
   startNbaLiveSyncScheduler();

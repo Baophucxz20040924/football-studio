@@ -129,6 +129,13 @@ const ESPN_NBA_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/b
 const MATCH_HISTORY_RETENTION_DAYS = Number(process.env.MATCH_HISTORY_RETENTION_DAYS || 45);
 const BET_HISTORY_RETENTION_DAYS = Number(process.env.BET_HISTORY_RETENTION_DAYS || 90);
 const DATA_CLEANUP_INTERVAL_MS = Number(process.env.DATA_CLEANUP_INTERVAL_MS || 12 * 60 * 60_000);
+const SERVER_STATS_UPDATE_INTERVAL_MS = Number(process.env.SERVER_STATS_UPDATE_INTERVAL_MS || 24 * 60 * 60_000);
+const SERVER_STATS_CATEGORY_NAME = String(process.env.SERVER_STATS_CATEGORY_NAME || "SERVER STATS").trim();
+const SERVER_STATS_GUILD_IDS = String(process.env.SERVER_STATS_GUILD_IDS || "1415385904226373676,1480386157551423549")
+  .split(",")
+  .map((id) => String(id).trim())
+  .filter((id) => id);
+const WORLDCUP_2026_TARGET_ISO = String(process.env.WORLDCUP_2026_TARGET_ISO || "2026-06-11T00:00:00Z").trim();
 const AVIATOR_TICK_MS = 100;
 const AVIATOR_K = 0.12;
 const AVIATOR_HOUSE_EDGE = Number(process.env.AVIATOR_HOUSE_EDGE || 0.01);
@@ -188,6 +195,7 @@ let nbaPrematchSyncInProgress = false;
 let nbaLiveSyncInProgress = false;
 let manualSyncInProgress = false;
 let dataCleanupIntervalId = null;
+let serverStatsIntervalId = null;
 
 function parseKickoffInput(value) {
   if (value instanceof Date) {
@@ -3060,6 +3068,138 @@ async function resolveGuildBroadcastChannel(guild) {
   return null;
 }
 
+function getWorldCupCountdownChannelName(nowMs = Date.now()) {
+  const targetMs = Date.parse(WORLDCUP_2026_TARGET_ISO);
+  if (!Number.isFinite(targetMs)) {
+    return "WorldCup 2026: Invalid date";
+  }
+
+  const diffMs = targetMs - nowMs;
+  if (diffMs <= 0) {
+    return "WorldCup 2026: Started";
+  }
+
+  const days = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+  return `WorldCup 2026: ${days}d`;
+}
+
+async function ensureServerStatChannel({ guild, channel, name, categoryId }) {
+  if (channel) {
+    if (channel.name !== name) {
+      await channel.setName(name);
+    }
+    return;
+  }
+
+  await guild.channels.create({
+    name,
+    type: ChannelType.GuildVoice,
+    parent: categoryId,
+    permissionOverwrites: [
+      {
+        id: guild.roles.everyone.id,
+        deny: [PermissionsBitField.Flags.Connect]
+      }
+    ]
+  });
+}
+
+async function updateGuildServerStatsChannels(guild) {
+  if (!guild) {
+    return;
+  }
+
+  const channels = await guild.channels.fetch();
+  let category = channels.find(
+    (channel) =>
+      channel &&
+      channel.type === ChannelType.GuildCategory &&
+      channel.name.toLowerCase() === SERVER_STATS_CATEGORY_NAME.toLowerCase()
+  );
+
+  if (!category) {
+    console.log(`[Server Stats] Category "${SERVER_STATS_CATEGORY_NAME}" not found. Creating it...`);
+    try {
+      category = await guild.channels.create({
+        name: SERVER_STATS_CATEGORY_NAME,
+        type: ChannelType.GuildCategory
+      });
+      console.log(`[Server Stats] Created category "${SERVER_STATS_CATEGORY_NAME}"`);
+    } catch (error) {
+      console.error(`[Server Stats] Failed to create category:`, error?.message || error);
+      return;
+    }
+  }
+  
+  console.log(`[Server Stats] Updating channels in category "${category.name}" (Guild: ${guild.name})`);
+
+
+  const voiceChannels = Array.from(channels.values()).filter(
+    (channel) => channel && channel.type === ChannelType.GuildVoice && channel.parentId === category.id
+  );
+
+  const allMembersChannel = voiceChannels.find((channel) => channel.name.toLowerCase().startsWith("all members"));
+  const membersChannel = voiceChannels.find(
+    (channel) =>
+      channel.name.toLowerCase().startsWith("members") &&
+      !channel.name.toLowerCase().startsWith("all members")
+  );
+  const worldCupChannel = voiceChannels.find((channel) => {
+    const lowered = channel.name.toLowerCase();
+    return lowered.startsWith("worldcup 2026") || lowered.startsWith("wordcup 2026");
+  });
+
+  const totalMembers = Number(guild.memberCount) || 0;
+  const botMembers = guild.members.cache.filter((member) => member.user?.bot).size;
+  const humanMembers = Math.max(0, totalMembers - botMembers);
+
+  await ensureServerStatChannel({
+    guild,
+    channel: allMembersChannel,
+    name: `All Members: ${totalMembers}`,
+    categoryId: category.id
+  });
+
+  await ensureServerStatChannel({
+    guild,
+    channel: membersChannel,
+    name: `Members: ${humanMembers}`,
+    categoryId: category.id
+  });
+
+  await ensureServerStatChannel({
+    guild,
+    channel: worldCupChannel,
+    name: getWorldCupCountdownChannelName(),
+    categoryId: category.id
+  });
+}
+
+async function updateAllGuildServerStatsChannels() {
+  for (const guild of client.guilds.cache.values()) {
+    if (!SERVER_STATS_GUILD_IDS.includes(guild.id)) {
+      continue;
+    }
+
+    try {
+      await updateGuildServerStatsChannels(guild);
+    } catch (error) {
+      console.error(`Failed to update server stats for guild ${guild.id}:`, error?.message || error);
+    }
+  }
+}
+
+function startServerStatsScheduler() {
+  if (serverStatsIntervalId) {
+    clearInterval(serverStatsIntervalId);
+  }
+
+  void updateAllGuildServerStatsChannels();
+  serverStatsIntervalId = setInterval(() => {
+    void updateAllGuildServerStatsChannels();
+  }, SERVER_STATS_UPDATE_INTERVAL_MS);
+}
+
 app.use(express.json());
 app.use("/admin", express.static(path.join(__dirname, "admin", "public")));
 app.use("/aviator/assets", express.static(path.join(__dirname, "aviator", "public")));
@@ -4122,6 +4262,7 @@ client.once("clientReady", () => {
   guilds.forEach((guildId) => {
     registerGuildCommands(guildId);
   });
+  startServerStatsScheduler();
 
   setSettlementBroadcaster(async (data) => {
     const { session, closePrice, closeDataAt, result, settled } = data;

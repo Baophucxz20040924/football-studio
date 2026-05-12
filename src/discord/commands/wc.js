@@ -1,9 +1,15 @@
-const { SlashCommandBuilder, MessageFlags } = require("discord.js");
+const {
+  SlashCommandBuilder,
+  MessageFlags,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle
+} = require("discord.js");
 const Match = require("../../models/Match");
 const { formatOdds, formatKickoff, buildEmbed } = require("./utils");
 
 const EMBED_DESCRIPTION_MAX = 4096;
-const EMBEDS_PER_MESSAGE_MAX = 10;
+const PAGE_SESSION_TIMEOUT_MS = 60_000;
 
 function chunkDescriptions(items, separator = "\n\n", maxLength = EMBED_DESCRIPTION_MAX) {
   const chunks = [];
@@ -38,6 +44,46 @@ function chunkDescriptions(items, separator = "\n\n", maxLength = EMBED_DESCRIPT
   }
 
   return chunks;
+}
+
+function buildPageEmbed({ description, page, totalPages }) {
+  const embed = buildEmbed({
+    title: totalPages > 1
+      ? `Open FIFA World Cup 2026 matches ⚽ (${page}/${totalPages})`
+      : "Open FIFA World Cup 2026 matches ⚽",
+    description,
+    color: 0xf6c244
+  });
+
+  if (totalPages > 1) {
+    embed.setFooter({ text: `Page ${page}/${totalPages}` });
+  }
+
+  return embed;
+}
+
+function buildPageButtons(page, totalPages, disabled = false) {
+  if (totalPages <= 1) {
+    return [];
+  }
+
+  return [new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId("wc:prev")
+      .setLabel("Prev")
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(disabled || page <= 1),
+    new ButtonBuilder()
+      .setCustomId("wc:next")
+      .setLabel("Next")
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(disabled || page >= totalPages),
+    new ButtonBuilder()
+      .setCustomId("wc:close")
+      .setLabel("Close")
+      .setStyle(ButtonStyle.Danger)
+      .setDisabled(disabled)
+  )];
 }
 
 module.exports = {
@@ -81,19 +127,66 @@ module.exports = {
     });
 
     const descriptions = chunkDescriptions(blocks);
-    const embeds = descriptions.map((description, index) => buildEmbed({
-      title: descriptions.length > 1
-        ? `Open FIFA World Cup 2026 matches ⚽ (${index + 1}/${descriptions.length})`
-        : "Open FIFA World Cup 2026 matches ⚽",
-      description,
-      color: 0xf6c244
-    }));
+    const totalPages = descriptions.length;
+    let currentPage = 1;
 
-    await interaction.reply({ embeds: embeds.slice(0, EMBEDS_PER_MESSAGE_MAX) });
+    const renderPayload = (page, disabled = false) => ({
+      embeds: [buildPageEmbed({
+        description: descriptions[page - 1] || "No data.",
+        page,
+        totalPages
+      })],
+      components: buildPageButtons(page, totalPages, disabled)
+    });
 
-    for (let i = EMBEDS_PER_MESSAGE_MAX; i < embeds.length; i += EMBEDS_PER_MESSAGE_MAX) {
-      await interaction.followUp({ embeds: embeds.slice(i, i + EMBEDS_PER_MESSAGE_MAX) });
-    }
+    await interaction.reply(renderPayload(currentPage));
+    const replyMessage = await interaction.fetchReply();
+
+    const collector = replyMessage.createMessageComponentCollector({
+      time: PAGE_SESSION_TIMEOUT_MS
+    });
+
+    collector.on("collect", async (btn) => {
+      if (btn.user.id !== interaction.user.id) {
+        await btn.reply({ content: "This panel belongs to another user.", flags: MessageFlags.Ephemeral });
+        return;
+      }
+
+      if (!btn.isButton()) {
+        return;
+      }
+
+      if (btn.customId === "wc:close") {
+        collector.stop("closed");
+        await btn.update({
+          embeds: [buildEmbed({
+            title: "Open FIFA World Cup 2026 matches ⚽",
+            description: "Closed.",
+            color: 0xf36c5c
+          })],
+          components: []
+        });
+        return;
+      }
+
+      if (btn.customId === "wc:prev") {
+        currentPage = Math.max(1, currentPage - 1);
+      } else if (btn.customId === "wc:next") {
+        currentPage = Math.min(totalPages, currentPage + 1);
+      } else {
+        return;
+      }
+
+      await btn.update(renderPayload(currentPage));
+    });
+
+    collector.on("end", async () => {
+      try {
+        await interaction.editReply(renderPayload(currentPage, true));
+      } catch {
+        // Ignore message update failures after timeout
+      }
+    });
 
     return null;
   }

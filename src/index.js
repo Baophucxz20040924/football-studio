@@ -136,6 +136,9 @@ const ESPN_NBA_PREMATCH_SYNC_NEAR_INTERVAL_MS = Number(process.env.ESPN_NBA_PREM
 const ESPN_NBA_PREMATCH_NEAR_WINDOW_MS = Number(process.env.ESPN_NBA_PREMATCH_NEAR_WINDOW_MS || 2 * 60 * 60_000);
 const ESPN_NBA_SYNC_DAYS_AHEAD = Number(process.env.ESPN_NBA_SYNC_DAYS_AHEAD || 7);
 const ESPN_NBA_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard";
+const ESPN_FETCH_MAX_ATTEMPTS = Math.max(1, Math.trunc(getNumberEnv("ESPN_FETCH_MAX_ATTEMPTS", null, 3)));
+const ESPN_FETCH_TIMEOUT_MS = Math.max(1_000, getNumberEnv("ESPN_FETCH_TIMEOUT_MS", null, 15_000));
+const ESPN_FETCH_RETRY_BASE_MS = Math.max(0, getNumberEnv("ESPN_FETCH_RETRY_BASE_MS", null, 2_000));
 const MATCH_HISTORY_RETENTION_DAYS = Number(process.env.MATCH_HISTORY_RETENTION_DAYS || 45);
 const BET_HISTORY_RETENTION_DAYS = Number(process.env.BET_HISTORY_RETENTION_DAYS || 90);
 const DATA_CLEANUP_INTERVAL_MS = Number(process.env.DATA_CLEANUP_INTERVAL_MS || 12 * 60 * 60_000);
@@ -356,31 +359,76 @@ function getNbaDateRangeTokenWithOffsets(startOffsetDays, endOffsetDays) {
   return `${toEspnDateToken(start)}-${toEspnDateToken(end)}`;
 }
 
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getErrorCode(error) {
+  return error?.code || error?.cause?.code || error?.name || error?.cause?.name || "";
+}
+
+function isTransientNetworkError(error) {
+  const code = getErrorCode(error);
+  return [
+    "ABORT_ERR",
+    "ECONNRESET",
+    "ETIMEDOUT",
+    "TimeoutError",
+    "UND_ERR_CONNECT_TIMEOUT",
+    "UND_ERR_HEADERS_TIMEOUT",
+    "UND_ERR_SOCKET",
+    "ERR_SSL_TLSV1_ALERT_INTERNAL_ERROR"
+  ].includes(code);
+}
+
+function shouldRetryEspnStatus(status) {
+  return status === 400 || status === 408 || status === 429 || status >= 500;
+}
+
 async function fetchScoreboardEvents(url, dates) {
-  const maxAttempts = 3;
+  const maxAttempts = Math.max(1, ESPN_FETCH_MAX_ATTEMPTS);
   let lastError;
+  const requestUrl = new URL(url);
+  requestUrl.searchParams.set("dates", dates);
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const response = await fetch(`${url}?dates=${dates}`, {
-      headers: {
-        Accept: "application/json",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    try {
+      const response = await fetch(requestUrl, {
+        headers: {
+          Accept: "application/json",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+        },
+        signal: AbortSignal.timeout(ESPN_FETCH_TIMEOUT_MS)
+      });
+
+      if (response.ok) {
+        const payload = await response.json();
+        return Array.isArray(payload?.events) ? payload.events : [];
       }
-    });
 
-    if (response.ok) {
-      const payload = await response.json();
-      return Array.isArray(payload?.events) ? payload.events : [];
-    }
+      lastError = new Error(`ESPN scoreboard failed with HTTP ${response.status}`);
 
-    lastError = new Error(`ESPN scoreboard failed with HTTP ${response.status}`);
-
-    if (response.status !== 429 && response.status !== 400) {
-      throw lastError;
+      if (!shouldRetryEspnStatus(response.status)) {
+        lastError.retryable = false;
+        throw lastError;
+      }
+    } catch (error) {
+      lastError = error;
+      if (error?.retryable === false) {
+        throw error;
+      }
+      if (!isTransientNetworkError(error) && attempt >= maxAttempts) {
+        throw error;
+      }
     }
 
     if (attempt < maxAttempts) {
-      await new Promise((resolve) => setTimeout(resolve, attempt * 5000));
+      const retryDelayMs = ESPN_FETCH_RETRY_BASE_MS * attempt;
+      console.warn(
+        `ESPN scoreboard request failed (attempt ${attempt}/${maxAttempts}, retrying in ${retryDelayMs}ms):`,
+        lastError?.message || lastError
+      );
+      await delay(retryDelayMs);
     }
   }
 
@@ -4574,6 +4622,12 @@ const client = new Client({
   intents: [GatewayIntentBits.Guilds]
 });
 
+function isTransientDiscordConnectionError(error) {
+  const message = String(error?.message || error || "");
+  return message.includes("Opening handshake has timed out")
+    || isTransientNetworkError(error);
+}
+
 function isIgnorableInteractionError(error) {
   return error?.code === 10062 || error?.code === 40060;
 }
@@ -4607,6 +4661,22 @@ client.on("interactionCreate", async (interaction) => {
 
 client.on("guildCreate", async (guild) => {
   await registerGuildCommands(guild.id);
+});
+
+client.on("error", (error) => {
+  console.error("Discord client error:", error);
+});
+
+client.on("shardError", (error, shardId) => {
+  console.error(`Discord shard ${shardId} error:`, error);
+});
+
+client.on("shardDisconnect", (event, shardId) => {
+  console.warn(`Discord shard ${shardId} disconnected: ${event?.code || "unknown"} ${event?.reason || ""}`.trim());
+});
+
+client.on("shardReconnecting", (shardId) => {
+  console.warn(`Discord shard ${shardId} reconnecting.`);
 });
 
 client.once("clientReady", () => {
@@ -4812,4 +4882,14 @@ process.on("unhandledRejection", (reason) => {
   }
 
   console.error("Unhandled promise rejection:", reason);
+});
+
+process.on("uncaughtException", (error) => {
+  if (isTransientDiscordConnectionError(error)) {
+    console.error("Transient Discord connection error:", error);
+    return;
+  }
+
+  console.error("Uncaught exception:", error);
+  process.exit(1);
 });

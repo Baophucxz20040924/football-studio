@@ -4,6 +4,8 @@ const { stopPorts } = require("./stop-all");
 require("dotenv").config();
 
 const npmCommand = "npm";
+const children = new Map();
+let shuttingDown = false;
 
 function runAndWait(command, args, { shell = false } = {}) {
   return new Promise((resolve, reject) => {
@@ -29,19 +31,53 @@ function runBackground(command, args, name, { shell = false, env = undefined } =
     shell,
     env: env ? { ...process.env, ...env } : process.env
   });
+  children.set(name, child);
 
   child.on("error", (error) => {
     console.error(`[${name}] failed to start`, error);
+    shutdown(1);
   });
 
-  child.on("exit", (code) => {
+  child.on("exit", (code, signal) => {
+    children.delete(name);
+    if (shuttingDown) {
+      return;
+    }
+
     if (code !== null && code !== 0) {
       console.error(`[${name}] exited with code ${code}`);
-      process.exitCode = code;
+      shutdown(code);
+      return;
     }
+
+    if (signal) {
+      console.error(`[${name}] exited from signal ${signal}`);
+      shutdown(1);
+      return;
+    }
+
+    console.error(`[${name}] exited unexpectedly.`);
+    shutdown(1);
   });
 
   return child;
+}
+
+function shutdown(exitCode = 0) {
+  if (shuttingDown) {
+    return;
+  }
+
+  shuttingDown = true;
+  for (const child of children.values()) {
+    if (!child.killed) {
+      child.kill("SIGINT");
+    }
+  }
+
+  setTimeout(() => {
+    process.exit(exitCode);
+  }, 1_500).unref();
 }
 
 async function main() {
@@ -70,10 +106,10 @@ async function main() {
   }
 
   console.log("[start-all] Starting bot, Tien Len server, and web-net-manager...");
-  const bot = runBackground("node", ["src/index.js"], "bot", {
+  runBackground("node", ["src/index.js"], "bot", {
     env: botMongoUri ? { MONGODB_URI: botMongoUri } : undefined,
   });
-  const tienlen = runBackground(
+  runBackground(
     npmCommand,
     ["run", "start", "--prefix", "src/tienlen/server"],
     "tienlen-server",
@@ -82,7 +118,7 @@ async function main() {
       env: tienLenMongoUri ? { MONGODB_URI: tienLenMongoUri } : undefined,
     }
   );
-  const webNetManager = runBackground(
+  runBackground(
     npmCommand,
     ["run", "start", "--prefix", "web-net-manager"],
     "web-net-manager",
@@ -96,14 +132,8 @@ async function main() {
     }
   );
 
-  const shutdown = () => {
-    bot.kill("SIGINT");
-    tienlen.kill("SIGINT");
-    webNetManager.kill("SIGINT");
-  };
-
-  process.on("SIGINT", shutdown);
-  process.on("SIGTERM", shutdown);
+  process.on("SIGINT", () => shutdown(0));
+  process.on("SIGTERM", () => shutdown(0));
 }
 
 main().catch((error) => {
